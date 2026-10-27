@@ -1,0 +1,14 @@
+{
+  "name": "PokéRogue PvP",
+  "short_name": "PokéRogue PvP",
+  "description": "A Pokémon roguelite fangame featuring PvP battles, endless mode, and deep roguelite progression.",
+  "scope": "/",
+  "start_url": "/",
+  "display": "fullscreen",
+  "background_color": "#8c8c8c",
+  "theme_color": "#8c8c8c",
+  "icons": [
+    { "src": "logo128.png", "sizes": "128x128", "type": "image/png" },
+    { "src": "logo512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

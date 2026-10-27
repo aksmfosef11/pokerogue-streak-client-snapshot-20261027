@@ -1,0 +1,330 @@
+{
+  "arena": {
+    "biome": 1,
+    "positionalTags": [],
+    "tags": []
+  },
+  "battleType": 1,
+  "challenges": [],
+  "enemyModifiers": [],
+  "enemyParty": [
+    {
+      "abilityIndex": 0,
+      "battleData": {},
+      "boss": false,
+      "bossSegments": 0,
+      "customPokemonData": {},
+      "formIndex": 0,
+      "friendship": 255,
+      "fusionCustomPokemonData": {},
+      "gender": 0,
+      "hp": 1,
+      "id": 101,
+      "isTerastallized": false,
+      "ivs": [31, 31, 31, 31, 31, 31],
+      "level": 100,
+      "metBiome": -1,
+      "metSpecies": 3,
+      "metWave": -1,
+      "moveset": [
+        {
+          "moveId": 75,
+          "ppUp": 0,
+          "ppUsed": 0
+        },
+        {
+          "moveId": 188,
+          "ppUp": 0,
+          "ppUsed": 0
+        },
+        {
+          "moveId": 235,
+          "ppUp": 0,
+          "ppUsed": 0
+        },
+        {
+          "moveId": 36,
+          "ppUp": 0,
+          "ppUsed": 0
+        }
+      ],
+      "nature": 0,
+      "player": false,
+      "species": 3,
+      "stats": [1, 1, 1, 1, 1, 1],
+      "status": null,
+      "stellarTypesBoosted": [],
+      "summonData": {},
+      "teraType": 0,
+      "variant": 0
+    },
+    {
+      "abilityIndex": 0,
+      "battleData": {},
+      "boss": false,
+      "bossSegments": 0,
+      "customPokemonData": {},
+      "formIndex": 0,
+      "friendship": 255,
+      "fusionCustomPokemonData": {},
+      "gender": 0,
+      "hp": 1,
+      "id": 102,
+      "isTerastallized": false,
+      "ivs": [31, 31, 31, 31, 31, 31],
+      "level": 100,
+      "metBiome": -1,
+      "metSpecies": 6,
+      "metWave": -1,
+      "moveset": [
+        {
+          "moveId": 53,
+          "ppUp": 0,
+          "ppUsed": 0
+        },
+        {
+          "moveId": 403,
+          "ppUp": 0,
+          "ppUsed": 0
+        },
+        {
+          "moveId": 163,
+          "ppUp": 0,
+          "ppUsed": 0
+        },
+        {
+          "moveId": 108,
+          "ppUp": 0,
+          "ppUsed": 0
+        }
+      ],
+      "nature": 0,
+      "player": false,
+      "species": 6,
+      "stats": [1, 1, 1, 1, 1, 1],
+      "status": null,
+      "stellarTypesBoosted": [],
+      "summonData": {},
+      "teraType": 0,
+      "variant": 0
+    },
+    {
+      "abilityIndex": 0,
+      "battleData": {},
+      "boss": false,
+      "bossSegments": 0,
+      "customPokemonData": {},
+      "formIndex": 0,
+      "friendship": 255,
+      "fusionCustomPokemonData": {},
+      "gender": 0,
+      "hp": 1,
+      "id": 103,
+      "isTerastallized": false,
+      "ivs": [31, 31, 31, 31, 31, 31],
+      "level": 100,
+      "metBiome": -1,
+      "metSpecies": 9,
+      "metWave": -1,
+      "moveset": [
+        {
+          "moveId": 57,
+          "ppUp": 0,
+          "ppUsed": 0
+        },
+        {
+          "moveId": 58,
+          "ppUp": 0,
+          "ppUsed": 0
+        },
+        {
+          "moveId": 44,
+          "ppUp": 0,
+          "ppUsed": 0
+        },
+        {
+          "moveId": 182,
+          "ppUp": 0,
+          "ppUsed": 0
+        }
+      ],
+      "nature": 0,
+      "player": false,
+      "species": 9,
+      "stats": [1, 1, 1, 1, 1, 1],
+      "status": null,
+      "stellarTypesBoosted": [],
+      "summonData": {},
+      "teraType": 0,
+      "variant": 0
+    }
+  ],
+  "gameMode": 0,
+  "gameVersion": "1.12.1.3",
+  "modifiers": [],
+  "money": 0,
+  "mysteryEncounterSaveData": {},
+  "mysteryEncounterType": -1,
+  "party": [
+    {
+      "abilityIndex": 0,
+      "battleData": {},
+      "boss": false,
+      "bossSegments": 0,
+      "customPokemonData": {},
+      "formIndex": 0,
+      "friendship": 255,
+      "fusionCustomPokemonData": {},
+      "gender": 0,
+      "hp": 1,
+      "id": 1,
+      "isTerastallized": false,
+      "ivs": [31, 31, 31, 31, 31, 31],
+      "level": 100,
+      "metBiome": -1,
+      "metSpecies": 3,
+      "metWave": -1,
+      "moveset": [
+        {
+          "moveId": 75,
+          "ppUp": 0,
+          "ppUsed": 0
+        },
+        {
+          "moveId": 188,
+          "ppUp": 0,
+          "ppUsed": 0
+        },
+        {
+          "moveId": 235,
+          "ppUp": 0,
+          "ppUsed": 0
+        },
+        {
+          "moveId": 36,
+          "ppUp": 0,
+          "ppUsed": 0
+        }
+      ],
+      "nature": 0,
+      "player": true,
+      "species": 3,
+      "stats": [1, 1, 1, 1, 1, 1],
+      "status": null,
+      "stellarTypesBoosted": [],
+      "summonData": {},
+      "teraType": 0,
+      "variant": 0
+    },
+    {
+      "abilityIndex": 0,
+      "battleData": {},
+      "boss": false,
+      "bossSegments": 0,
+      "customPokemonData": {},
+      "formIndex": 0,
+      "friendship": 255,
+      "fusionCustomPokemonData": {},
+      "gender": 0,
+      "hp": 1,
+      "id": 2,
+      "isTerastallized": false,
+      "ivs": [31, 31, 31, 31, 31, 31],
+      "level": 100,
+      "metBiome": -1,
+      "metSpecies": 6,
+      "metWave": -1,
+      "moveset": [
+        {
+          "moveId": 53,
+          "ppUp": 0,
+          "ppUsed": 0
+        },
+        {
+          "moveId": 403,
+          "ppUp": 0,
+          "ppUsed": 0
+        },
+        {
+          "moveId": 163,
+          "ppUp": 0,
+          "ppUsed": 0
+        },
+        {
+          "moveId": 108,
+          "ppUp": 0,
+          "ppUsed": 0
+        }
+      ],
+      "nature": 0,
+      "player": true,
+      "species": 6,
+      "stats": [1, 1, 1, 1, 1, 1],
+      "status": null,
+      "stellarTypesBoosted": [],
+      "summonData": {},
+      "teraType": 0,
+      "variant": 0
+    },
+    {
+      "abilityIndex": 0,
+      "battleData": {},
+      "boss": false,
+      "bossSegments": 0,
+      "customPokemonData": {},
+      "formIndex": 0,
+      "friendship": 255,
+      "fusionCustomPokemonData": {},
+      "gender": 0,
+      "hp": 1,
+      "id": 3,
+      "isTerastallized": false,
+      "ivs": [31, 31, 31, 31, 31, 31],
+      "level": 100,
+      "metBiome": -1,
+      "metSpecies": 9,
+      "metWave": -1,
+      "moveset": [
+        {
+          "moveId": 57,
+          "ppUp": 0,
+          "ppUsed": 0
+        },
+        {
+          "moveId": 58,
+          "ppUp": 0,
+          "ppUsed": 0
+        },
+        {
+          "moveId": 44,
+          "ppUp": 0,
+          "ppUsed": 0
+        },
+        {
+          "moveId": 182,
+          "ppUp": 0,
+          "ppUsed": 0
+        }
+      ],
+      "nature": 0,
+      "player": true,
+      "species": 9,
+      "stats": [1, 1, 1, 1, 1, 1],
+      "status": null,
+      "stellarTypesBoosted": [],
+      "summonData": {},
+      "teraType": 0,
+      "variant": 0
+    }
+  ],
+  "playerFaints": 0,
+  "pokeballCounts": {},
+  "score": 0,
+  "seed": "c5ce8e7a2b354b98a231fa36",
+  "timestamp": 1792818591115,
+  "trainer": {
+    "trainerType": 1,
+    "variant": 0
+  },
+  "waveIndex": 100
+}

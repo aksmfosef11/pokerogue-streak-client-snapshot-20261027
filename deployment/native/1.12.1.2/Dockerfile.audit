@@ -1,0 +1,3 @@
+FROM auditbase
+WORKDIR /app
+COPY . .

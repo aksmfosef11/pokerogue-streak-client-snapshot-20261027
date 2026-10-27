@@ -1,0 +1,158 @@
+<!--
+SPDX-FileCopyrightText: 2025 Pagefault Games
+SPDX-License-Identifier: AGPL-3.0-only
+-->
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8" />
+	<title>PokéRogue PvP</title>
+	<meta name="title" content="PokéRogue PvP" />
+	<meta name="description" content="A Pokémon roguelite fangame featuring PvP battles, endless mode, and deep roguelite progression." />
+	<meta name="theme-color" content="#da3838" />
+	<meta name="keywords" content="pokerogue, pokemon, roguelite, pvp" />
+	<meta name="news_keywords" content="pokerogue, pokemon, roguelite, pvp" />
+	<meta name="distribution" content="Global">
+	<meta http-equiv="audience" content="General">
+	<meta property="og:title" content="PokéRogue PvP" />
+	<meta property="og:type" content="website" />
+	<meta property="og:description" content="A Pokémon roguelite fangame featuring PvP battles, endless mode, and deep roguelite progression." />
+	<meta property="og:image" content="./logo512.png" />
+	<meta property="og:site_name" content="PokéRogue PvP" />
+	<meta property="twitter:title" content="PokéRogue PvP" />
+	<meta property="twitter:description" content="A Pokémon roguelite fangame featuring PvP battles, endless mode, and deep roguelite progression." />
+	<meta property="twitter:image" content="./logo512.png" />
+	<meta property="twitter:card" content="summary" />
+	<link rel="apple-touch-icon" href="./logo512.png" />
+	<link rel="shortcut icon" type="image/png" href="./logo512.png" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
+	<style type="text/css">
+		@font-face {
+			font-family: 'emerald';
+			src: url('./fonts/pokemon-emerald-pro.ttf') format('truetype');
+		}
+
+		@font-face {
+			font-family: 'pkmnems';
+			src: url('./fonts/pkmnems.ttf') format('truetype');
+		}
+	</style>
+	<link rel="stylesheet" type="text/css" href="./index.css" />
+	<link rel="manifest" href="./manifest.webmanifest">
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", function () {
+        navigator.serviceWorker.register("./service-worker.js").then(
+          function (registration) {
+            console.log("ServiceWorker registration successful");
+          },
+          function (err) {
+            console.log("ServiceWorker registration failed: ", err);
+          },
+        );
+      });
+    }
+
+    window.addEventListener('beforeinstallprompt', e => {
+      // Prevent invasive install prompt (users are still able to install as an app)
+      e.preventDefault();
+    });
+  </script>
+</head>
+
+<body>
+	<div id="app"></div>
+	<div id="touchControls">
+		<div class="left">
+			<div id="control-group-dpad" class="control-group control-group-dpad">
+				<div id="dpad" data-control-key="DPAD">
+					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72">
+						<title>D-Pad Touch Controls</title>
+						<path id="dpadUp" data-key="UP"
+							d="M48,5.8C48,2.5,45.4,0,42,0H29.9C26.6,0,24,2.4,24,5.8V24h24V5.8z" />
+						<path id="dpadRight" data-key="RIGHT"
+							d="M66.2,24H48v24h18.2c3.3,0,5.8-2.7,5.8-6V29.9C72,26.5,69.5,24,66.2,24z" />
+						<path id="dpadDown" data-key="DOWN"
+							d="M24,66.3c0,3.3,2.6,5.7,5.9,5.7H42c3.3,0,6-2.4,6-5.7V48H24V66.3z" />
+						<path id="dpadLeft" data-key="LEFT"
+							d="M5.7,24C2.4,24,0,26.5,0,29.9V42c0,3.3,2.3,6,5.7,6H24V24H5.7z" />
+						<rect id="dpadCenter" x="24" y="24" width="24" height="24" />
+					</svg>
+				</div>
+			</div>
+		</div>
+
+		<div class="right">
+			<div id="control-group-action" class="control-group">
+				<div id="apadAction" class="apad-button apad-circle" data-key="ACTION">
+					<span class="apad-label">A</span>
+				</div>
+			</div>
+
+			<div id="control-group-cancel" class="control-group">
+				<div id="apadCancel" class="apad-button apad-circle" data-key="CANCEL">
+					<span class="apad-label">B</span>
+				</div>
+			</div>
+
+			<div id="control-group-extra-1" class="control-group control-group-extra">
+				<!-- buttons to navigate settings tabs -->
+				<div id="apadPreviousTab" class="apad-button apad-square apad-small" data-key="CYCLE_FORM">
+					<span class="apad-label">F</span>
+				</div>
+				<div id="apadNextTab" class="apad-button apad-square apad-small" data-key="CYCLE_SHINY">
+					<span class="apad-label">R</span>
+				</div>
+				<!-- buttons to open filter menu in starter select -->
+				<div id="apadOpenFilters" class="apad-button apad-rectangle apad-small" data-key="STATS">
+					<span class="apad-label">C</span>
+				</div>
+				<!-- main menu button -->
+				<div id="apadMenu" class="apad-button apad-rectangle apad-small" data-key="MENU">
+					<span class="apad-label">Menu</span>
+				</div>
+			</div>
+
+			<div id="control-group-extra-2" class="control-group control-group-extra">
+				<!-- buttons to cycle through pokemon characteristics in starter select -->
+				<div id="apadCycleForm" class="apad-button apad-square apad-small" data-key="CYCLE_FORM">
+					<span class="apad-label">F</span>
+				</div>
+				<div id="apadCycleGender" class="apad-button apad-square apad-small" data-key="CYCLE_GENDER">
+					<span class="apad-label">G</span>
+				</div>
+				<div id="apadCycleShiny" class="apad-button apad-square apad-small" data-key="CYCLE_SHINY">
+					<span class="apad-label">R</span>
+				</div>
+				<div id="apadCycleAbility" class="apad-button apad-square apad-small" data-key="CYCLE_ABILITY">
+					<span class="apad-label">E</span>
+				</div>
+				<div id="apadCycleNature" class="apad-button apad-square apad-small" data-key="CYCLE_NATURE">
+					<span class="apad-label">N</span>
+				</div>
+				<div id="apadCycleTera" class="apad-button apad-square apad-small" data-key="CYCLE_TERA">
+					<span class="apad-label">V</span>
+				</div>
+				<!-- buttons to display battle-specific information -->
+				<div id="apadInfo" class="apad-button apad-rectangle apad-small" data-key="CYCLE_TERA">
+					<span class="apad-label">V</span>
+				</div>
+				<div id="apadStats" class="apad-button apad-rectangle apad-small" data-key="STATS">
+					<span class="apad-label">C</span>
+				</div>
+			</div>
+
+		</div>
+	</div>
+	<footer id="disclaimer-footer">
+		<p>
+			<strong>PokéRogue PvP</strong> is a non-commercial, fan-made project. Pokémon and all related characters, trademarks, and assets are © and ™ Nintendo, Creatures Inc., Game Freak Inc., and The Pokémon Company. This project is not affiliated with or endorsed by Nintendo or Pokémon, and does not accept any ads, donations, or commercial monetization.
+		</p>
+		<p style="margin-top: 4px; font-size: 0.9em; opacity: 0.85;">
+			<strong>PokéRogue PvP</strong>는 비영리 팬메이드 프로젝트입니다. Pokémon 및 관련 모든 캐릭터·상표·에셋의 저작권과 상표권은 Nintendo, Creatures Inc., Game Freak Inc., The Pokémon Company에 귀속됩니다. 본 프로젝트는 상업적 목적(광고/후원/과금)을 일절 갖지 않으며 공식 제품과 무관합니다.
+		</p>
+	</footer>
+	<script type="module" src="./src/main.ts"></script>
+</body>
+</html>

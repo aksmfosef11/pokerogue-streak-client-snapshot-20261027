@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2024-2025 NONE
+#
+# SPDX-License-Identifier: CC0-1.0
+
+
+[submodule "assets"]
+	path = assets
+	url = https://github.com/pagefaultgames/pokerogue-assets.git
+	branch = beta
+[submodule "locales"]
+	path = locales
+	url = https://github.com/pagefaultgames/pokerogue-locales.git
+	branch = main
+
+[submodule "native-1.12.1.2-assets"]
+	path = deployment/native/1.12.1.2/assets
+	url = https://github.com/pagefaultgames/pokerogue-assets.git
+
+[submodule "native-1.12.1.2-locales"]
+	path = deployment/native/1.12.1.2/locales
+	url = https://github.com/pagefaultgames/pokerogue-locales.git
+
+[submodule "native-1.12.2.0-assets"]
+	path = deployment/native/1.12.2.0/assets
+	url = https://github.com/pagefaultgames/pokerogue-assets.git
+
+[submodule "native-1.12.2.0-locales"]
+	path = deployment/native/1.12.2.0/locales
+	url = https://github.com/pagefaultgames/pokerogue-locales.git

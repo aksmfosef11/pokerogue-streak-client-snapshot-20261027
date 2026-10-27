@@ -1,0 +1,338 @@
+[
+  {
+    "choice": {
+      "args": [
+        1,
+        null,
+      ],
+      "command": 0,
+      "cursor": 0,
+      "move": {
+        "move": 75,
+        "targets": [
+          2,
+        ],
+        "useMode": 1,
+      },
+    },
+    "digest": "59156a168c9880c84311b2b2d9cc6d509c0a8d60002bbc4ef6be100b05831ad1",
+    "index": 0,
+    "kind": "turn",
+  },
+  {
+    "afterTurn": 1,
+    "digest": "a3252daf37fb8d7b7cfbd62dac9359baca36d51e4c9539a6bbd426f5b1e9f9ea",
+    "hp": [
+      194,
+      297,
+      299,
+      285,
+      297,
+      299,
+    ],
+  },
+  {
+    "choice": {
+      "args": [
+        1,
+        null,
+      ],
+      "command": 0,
+      "cursor": 0,
+      "move": {
+        "move": 75,
+        "targets": [
+          2,
+        ],
+        "useMode": 1,
+      },
+    },
+    "digest": "ac064802bd95cce29d93412da8d9e9fbd903ab7db6c5e50dd110402bdd250fd9",
+    "index": 1,
+    "kind": "turn",
+  },
+  {
+    "afterTurn": 2,
+    "digest": "75e4439e11549a249375103646a977cde1afea1a5156aaf4be9937f8808a03c7",
+    "hp": [
+      87,
+      297,
+      299,
+      269,
+      297,
+      299,
+    ],
+  },
+  {
+    "choice": {
+      "args": [
+        1,
+        null,
+      ],
+      "command": 0,
+      "cursor": 0,
+      "move": {
+        "move": 75,
+        "targets": [
+          2,
+        ],
+        "useMode": 1,
+      },
+    },
+    "digest": "903c4e7352f8547ba758d3d9c311f1fd14ba0ae38ab9e48ab4957a8f202fffd0",
+    "index": 2,
+    "kind": "turn",
+  },
+  {
+    "afterTurn": 3,
+    "digest": "4ab5d8029da5f4ac469cbe3e6c22df43c5a3c5ab5b7f6591027b4fb8441a9a21",
+    "hp": [
+      0,
+      297,
+      299,
+      269,
+      297,
+      299,
+    ],
+  },
+  {
+    "choice": {
+      "slotIndex": 1,
+    },
+    "digest": "5383a663477f0ca8aefe4c62816718aa533545b619b7ccc95f67fed5abae90b6",
+    "index": 3,
+    "kind": "switch",
+  },
+  {
+    "choice": {
+      "args": [
+        1,
+        null,
+      ],
+      "command": 0,
+      "cursor": 0,
+      "move": {
+        "move": 53,
+        "targets": [
+          2,
+        ],
+        "useMode": 1,
+      },
+    },
+    "digest": "e36d39ca272da36940c85ab0409a5014fce102c07a0570b8e580bb76932626e8",
+    "index": 4,
+    "kind": "turn",
+  },
+  {
+    "afterTurn": 4,
+    "digest": "81a9eb67d2ab3179d11ce084a1196637ee1d725f6a6331f32b38fdb548d43c34",
+    "hp": [
+      297,
+      0,
+      299,
+      222,
+      297,
+      269,
+    ],
+  },
+  {
+    "choice": {
+      "args": [
+        1,
+        null,
+      ],
+      "command": 0,
+      "cursor": 0,
+      "move": {
+        "move": 53,
+        "targets": [
+          2,
+        ],
+        "useMode": 1,
+      },
+    },
+    "digest": "f228570fb5676a7f6a95febcd2d3ad7e86d88b5241a7446ed2cbef3825c8e7cc",
+    "index": 5,
+    "kind": "turn",
+  },
+  {
+    "afterTurn": 5,
+    "digest": "8412c16824a9718341657f5fb4a31a1ffe9efc60e81514e3519c7079ace8353b",
+    "hp": [
+      79,
+      0,
+      299,
+      144,
+      297,
+      269,
+    ],
+  },
+  {
+    "choice": {
+      "args": [
+        1,
+        null,
+      ],
+      "command": 0,
+      "cursor": 0,
+      "move": {
+        "move": 53,
+        "targets": [
+          2,
+        ],
+        "useMode": 1,
+      },
+    },
+    "digest": "99f1d4fb45b9c829295b3bdb24a4f64c29f95adf083dbbbb353a3ab9adaaf223",
+    "index": 6,
+    "kind": "turn",
+  },
+  {
+    "afterTurn": 6,
+    "digest": "c7929c0bf16c4263ec036a8453284e657cf1268dc6d8acdd524213386d43e002",
+    "hp": [
+      0,
+      0,
+      299,
+      39,
+      297,
+      269,
+    ],
+  },
+  {
+    "choice": {
+      "slotIndex": 2,
+    },
+    "digest": "e550b9e75b005e13ee1690167377fc2c910c059552543f5451ab4d30a8c21df4",
+    "index": 7,
+    "kind": "switch",
+  },
+  {
+    "choice": {
+      "args": [
+        1,
+        null,
+      ],
+      "command": 0,
+      "cursor": 0,
+      "move": {
+        "move": 57,
+        "targets": [
+          2,
+        ],
+        "useMode": 1,
+      },
+    },
+    "digest": "acf0754794940519612eef821519c3e88c476b1311ff4f34c58e2ed210d648d0",
+    "index": 8,
+    "kind": "turn",
+  },
+  {
+    "afterTurn": 7,
+    "digest": "355486604f6beb567055bbf9f598056cd7d416b45ff1ddb24d8bae1d26967f18",
+    "hp": [
+      299,
+      0,
+      0,
+      0,
+      297,
+      269,
+    ],
+  },
+  {
+    "choice": {
+      "args": [
+        1,
+        null,
+      ],
+      "command": 0,
+      "cursor": 0,
+      "move": {
+        "move": 57,
+        "targets": [
+          2,
+        ],
+        "useMode": 1,
+      },
+    },
+    "digest": "483a10eff17a9211c0e18ee9b2358f37c6489a9d2304c2fc23dab905102b5ade",
+    "index": 9,
+    "kind": "turn",
+  },
+  {
+    "afterTurn": 8,
+    "digest": "3cee598278bac6adc99704f537077566dcaf61a672617a74ca3e531bb4e4eeb4",
+    "hp": [
+      129,
+      0,
+      0,
+      223,
+      297,
+      0,
+    ],
+  },
+  {
+    "choice": {
+      "args": [
+        1,
+        null,
+      ],
+      "command": 0,
+      "cursor": 0,
+      "move": {
+        "move": 57,
+        "targets": [
+          2,
+        ],
+        "useMode": 1,
+      },
+    },
+    "digest": "c308873bbdf5269720ab1722641fceddbda67ea4d90681a1b3b86808aca774e0",
+    "index": 10,
+    "kind": "turn",
+  },
+  {
+    "afterTurn": 9,
+    "digest": "ca70bb7d5f5f9ab03af826af1cb1baa5c981ecf3ac0e6bc6177b8df2d171a1bf",
+    "hp": [
+      72,
+      0,
+      0,
+      141,
+      297,
+      0,
+    ],
+  },
+  {
+    "choice": {
+      "args": [
+        1,
+        null,
+      ],
+      "command": 0,
+      "cursor": 0,
+      "move": {
+        "move": 57,
+        "targets": [
+          2,
+        ],
+        "useMode": 1,
+      },
+    },
+    "digest": "8b7ad41a2848c181af9669fa567dfbef84d922aa0d404c813b23e18e8f2aa1d6",
+    "index": 11,
+    "kind": "turn",
+  },
+  {
+    "afterTurn": 10,
+    "digest": "b4548f6ebb625ab3bb67baa1bb4fe413c4b1cc8b02756a7a65c7ad703c9acdf9",
+    "hp": [
+      0,
+      0,
+      0,
+      141,
+      297,
+      0,
+    ],
+  },
+]

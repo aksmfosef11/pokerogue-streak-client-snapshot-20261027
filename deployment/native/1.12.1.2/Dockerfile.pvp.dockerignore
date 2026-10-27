@@ -1,0 +1,11 @@
+node_modules
+.git
+**/.git
+dist
+*.log
+*.local
+**/*.local
+.env
+.env.*
+game-data-output
+test/fixtures/pvp/audit-result.json

@@ -1,0 +1,50 @@
+[
+  {
+    "version": "1.12.1.2",
+    "kind": "assets",
+    "path": "deployment/native/1.12.1.2/assets",
+    "pin": "64b3f47cd586589261fe8cb08c8d540d710bfc1c",
+    "overlay": "deployment/media-overrides/1.12.1.2/assets",
+    "changedFiles": 0
+  },
+  {
+    "version": "1.12.1.2",
+    "kind": "locales",
+    "path": "deployment/native/1.12.1.2/locales",
+    "pin": "5cd9ba827721461a5a68edc55cc00b8b8aabd61d",
+    "overlay": "deployment/media-overrides/1.12.1.2/locales",
+    "changedFiles": 0
+  },
+  {
+    "version": "1.12.1.3",
+    "kind": "assets",
+    "path": "assets",
+    "pin": "64b3f47cd586589261fe8cb08c8d540d710bfc1c",
+    "overlay": "deployment/media-overrides/1.12.1.3/assets",
+    "changedFiles": 4
+  },
+  {
+    "version": "1.12.1.3",
+    "kind": "locales",
+    "path": "locales",
+    "pin": "5cd9ba827721461a5a68edc55cc00b8b8aabd61d",
+    "overlay": "deployment/media-overrides/1.12.1.3/locales",
+    "changedFiles": 2
+  },
+  {
+    "version": "1.12.2.0",
+    "kind": "assets",
+    "path": "deployment/native/1.12.2.0/assets",
+    "pin": "37789817134f881da0a038af21991ccc93a66372",
+    "overlay": "deployment/media-overrides/1.12.2.0/assets",
+    "changedFiles": 4
+  },
+  {
+    "version": "1.12.2.0",
+    "kind": "locales",
+    "path": "deployment/native/1.12.2.0/locales",
+    "pin": "485b48ebcd11b962b303875b9776fad9a844b6f7",
+    "overlay": "deployment/media-overrides/1.12.2.0/locales",
+    "changedFiles": 2
+  }
+]

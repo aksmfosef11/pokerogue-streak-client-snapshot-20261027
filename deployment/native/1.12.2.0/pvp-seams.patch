@@ -1,0 +1,311 @@
+diff --git a/src/battle-scene.ts b/src/battle-scene.ts
+index 762f800b..669b218b 100644
+--- a/src/battle-scene.ts
++++ b/src/battle-scene.ts
+@@ -110,6 +110,7 @@ import type { Achv } from "#system/achv";
+ import { achvs, ModifierAchv, MoneyAchv } from "#system/achv";
+ import { GameData } from "#system/game-data";
+ import { initGameSpeed } from "#system/game-speed";
++import { ModifierData as PvpModifierData } from "#system/modifier-data";
+ import type { PokemonData } from "#system/pokemon-data";
+ import type { Voucher } from "#system/voucher";
+ import { vouchers } from "#system/voucher";
+@@ -158,6 +159,7 @@ import { decodeNickname } from "#utils/pokemon-utils";
+ import { capitalizeFirstLetterOnly } from "#utils/strings";
+ import i18next from "i18next";
+ import Phaser from "phaser";
++import { logItem } from "./pvp/log";
+ 
+ export type PokeballCounts = Record<Exclude<PokeballType, PokeballType.LUXURY_BALL>, number>;
+ 
+@@ -2394,6 +2396,9 @@ export class BattleScene extends SceneBase {
+     if (!modifier || !modifier.type) {
+       return false;
+     }
++    if (modifier instanceof PersistentModifier) {
++      logItem(new PvpModifierData(modifier, true), this.phaseManager.getCurrentPhase().phaseName, virtual);
++    }
+     let success = false;
+     const soundName = modifier.type.soundName;
+     this.validateAchvs(ModifierAchv, modifier);
+diff --git a/src/data/egg.ts b/src/data/egg.ts
+index bfaf7fe9..f7d1f156 100644
+--- a/src/data/egg.ts
++++ b/src/data/egg.ts
+@@ -33,6 +33,7 @@ import { VariantTier } from "#enums/variant-tier";
+ import type { PlayerPokemon } from "#field/pokemon";
+ import { getIvsFromId, randInt, randomString, randSeedInt } from "#utils/common";
+ import i18next from "i18next";
++import { beginEggProof, eggEntropy, finishEggProof } from "../pvp/egg-proof";
+ 
+ export const EGG_SEED = 1073741824;
+ 
+@@ -153,23 +154,25 @@ export class Egg {
+   // #endregion Public facing properties
+ 
+   constructor(eggOptions?: IEggOptions) {
++    const proof = beginEggProof(eggOptions);
+     const generateEggProperties = (eggOptions?: IEggOptions) => {
+       //if (eggOptions.tier && eggOptions.species) throw Error("Error egg can't have species and tier as option. only choose one of them.")
+ 
+       this._sourceType = eggOptions?.sourceType!; // TODO: is this bang correct?
+       // Ensure _sourceType is defined before invoking rollEggTier(), as it is referenced
+-      this._tier = eggOptions?.tier ?? activeOverrides.EGG_TIER_OVERRIDE ?? this.rollEggTier();
++      this._tier =
++        eggOptions?.tier ?? activeOverrides.EGG_TIER_OVERRIDE ?? eggEntropy(proof, "tier", () => this.rollEggTier());
+       // If egg was pulled, check if egg pity needs to override the egg tier
+       if (eggOptions?.pulled) {
+         // Needs this._tier and this._sourceType to work
+         this.checkForPityTierOverrides();
+       }
+ 
+-      this._id = eggOptions?.id ?? randInt(EGG_SEED, EGG_SEED * this._tier);
++      this._id = eggOptions?.id ?? eggEntropy(proof, "id", () => randInt(EGG_SEED, EGG_SEED * this._tier));
+ 
+       this._sourceType = eggOptions?.sourceType ?? undefined;
+       this._hatchWaves = eggOptions?.hatchWaves ?? this.getEggTierDefaultHatchWaves();
+-      this._timestamp = eggOptions?.timestamp ?? Date.now();
++      this._timestamp = eggOptions?.timestamp ?? proof?.receipt.options.timestamp ?? Date.now();
+ 
+       // First roll shiny and variant so we can filter if species with an variant exist
+       this._isShiny = eggOptions?.isShiny ?? (activeOverrides.EGG_SHINY_OVERRIDE || this.rollShiny());
+@@ -200,7 +203,7 @@ export class Egg {
+       }
+     };
+ 
+-    const seedOverride = randomString(24);
++    const seedOverride = proof?.seed ?? randomString(24);
+     globalScene.executeWithSeedOffset(
+       () => {
+         generateEggProperties(eggOptions);
+@@ -210,6 +213,7 @@ export class Egg {
+     );
+ 
+     this.eggDescriptor = eggOptions?.eggDescriptor;
++    finishEggProof(this, proof);
+   }
+ 
+   // #region Public methods
+diff --git a/src/data/status-effect.ts b/src/data/status-effect.ts
+index b59e83f7..b0e8369f 100644
+--- a/src/data/status-effect.ts
++++ b/src/data/status-effect.ts
+@@ -1,5 +1,5 @@
+ import { StatusEffect } from "#enums/status-effect";
+-import { randIntRange } from "#utils/common";
++import { randSeedIntRange } from "#utils/common";
+ import type { ParseKeys } from "i18next";
+ import i18next from "i18next";
+ 
+@@ -129,7 +129,7 @@ export function getStatusEffectCatchRateMultiplier(statusEffect: StatusEffect):
+  * Returns a random non-volatile StatusEffect
+  */
+ export function generateRandomStatusEffect(): StatusEffect {
+-  return randIntRange(1, 6);
++  return randSeedIntRange(1, 6);
+ }
+ 
+ /**
+@@ -145,7 +145,7 @@ export function getRandomStatusEffect(statusEffectA: StatusEffect, statusEffectB
+     return statusEffectA;
+   }
+ 
+-  return randIntRange(0, 1) ? statusEffectA : statusEffectB;
++  return randSeedIntRange(0, 1) ? statusEffectA : statusEffectB;
+ }
+ 
+ /**
+@@ -161,7 +161,7 @@ export function getRandomStatus(statusA: Status | null, statusB: Status | null):
+     return statusA;
+   }
+ 
+-  return randIntRange(0, 1) ? statusA : statusB;
++  return randSeedIntRange(0, 1) ? statusA : statusB;
+ }
+ 
+ /**
+diff --git a/src/phases/select-modifier-phase.ts b/src/phases/select-modifier-phase.ts
+index 3a213c3f..7bcdb237 100644
+--- a/src/phases/select-modifier-phase.ts
++++ b/src/phases/select-modifier-phase.ts
+@@ -32,6 +32,7 @@ import { SHOP_OPTIONS_ROW_LIMIT } from "#ui/modifier-select-ui-handler";
+ import { PartyOption, PartyUiHandler } from "#ui/party-ui-handler";
+ import { NumberHolder } from "#utils/common";
+ import i18next from "i18next";
++import { logShop, logShopOffer } from "../pvp/log";
+ 
+ export type ModifierSelectCallback = (rowCursor: number, cursor: number) => boolean;
+ 
+@@ -78,8 +79,10 @@ export class SelectModifierPhase extends BattlePhase {
+     const modifierCount = this.getModifierCount();
+ 
+     this.typeOptions = this.getModifierTypeOptions(modifierCount);
++    logShopOffer(this, this.typeOptions);
+ 
+     const modifierSelectCallback = (rowCursor: number, cursor: number) => {
++      logShop({ rowCursor, cursor, rerolls: this.rerollCount });
+       if (rowCursor < 0 || cursor < 0) {
+         globalScene.ui.showText(i18next.t("battle:skipItemQuestion"), null, () => {
+           const skipRewardConfirmOptions: ConfirmModeConfig = {
+diff --git a/src/phases/select-starter-phase.ts b/src/phases/select-starter-phase.ts
+index 60b1ed0f..93191a1e 100644
+--- a/src/phases/select-starter-phase.ts
++++ b/src/phases/select-starter-phase.ts
+@@ -11,6 +11,7 @@ import { overrideHeldItems, overrideModifiers } from "#modifiers/modifier";
+ import type { Starter } from "#types/save-data";
+ import { SaveSlotUiMode } from "#ui/save-slot-select-ui-handler";
+ import { applyChallenges } from "#utils/challenge-utils";
++import { prepareRankedRun } from "../pvp/log";
+ 
+ export class SelectStarterPhase extends Phase {
+   public readonly phaseName = "SelectStarterPhase";
+@@ -38,7 +39,8 @@ export class SelectStarterPhase extends Phase {
+    * Initialize starters before starting the first battle
+    * @param starters - Array of {@linkcode Starter}s with which to start the battle
+    */
+-  initBattle(starters: Starter[]) {
++  async initBattle(starters: Starter[]) {
++    await prepareRankedRun(starters);
+     const party = globalScene.getPlayerParty();
+     const loadPokemonAssets: Promise<void>[] = [];
+     starters.forEach((starter: Starter, i: number) => {
+diff --git a/src/phases/title-phase.ts b/src/phases/title-phase.ts
+index 3f0d42f4..52196df3 100644
+--- a/src/phases/title-phase.ts
++++ b/src/phases/title-phase.ts
+@@ -24,6 +24,7 @@ import type { OptionSelectItem, OptionSelectModeConfig } from "#types/ui-types";
+ import { SaveSlotUiMode } from "#ui/save-slot-select-ui-handler";
+ import { isLocalServerConnected } from "#utils/common";
+ import i18next from "i18next";
++import { openLatestGame, pvpBoot, pvpMenuOptions } from "../pvp";
+ 
+ const NO_SAVE_SLOT = -1;
+ 
+@@ -46,6 +47,14 @@ export class TitlePhase extends Phase {
+       audioManager.playBgm("title", true);
+     }
+ 
++    if (
++      await pvpBoot(() => {
++        this.loaded = true;
++        this.end();
++      })
++    ) {
++      return;
++    }
+     const lastSlot = await this.checkLastSaveSlot();
+     await this.showOptions(lastSlot);
+   }
+@@ -96,6 +105,7 @@ export class TitlePhase extends Phase {
+       {
+         label: i18next.t("menu:newGame"),
+         handler: () => {
++          if (openLatestGame()) { return true; }
+           const setModeAndEnd = (gameMode: GameModes) => {
+             this.gameMode = gameMode;
+             ui.setMode(UiMode.MESSAGE);
+@@ -188,6 +198,7 @@ export class TitlePhase extends Phase {
+         keepOpen: true,
+       },
+     );
++    options.push(...pvpMenuOptions());
+     const config: OptionSelectModeConfig = { options, blockCancelButton: true };
+     await ui.setMode(UiMode.TITLE, config);
+   }
+diff --git a/src/system/game-data.ts b/src/system/game-data.ts
+index c28c809f..24831c72 100644
+--- a/src/system/game-data.ts
++++ b/src/system/game-data.ts
+@@ -79,6 +79,11 @@ import { toCamelCase } from "#utils/strings";
+ import { ValueHolder } from "#utils/value-holder";
+ import { AES, enc } from "crypto-js";
+ import i18next from "i18next";
++import { finalizeRun, recordWave } from "../pvp/log";
++import { isPvpMatchActive, pvpEnabled } from "../pvp/state";
++import { isBattleClient } from "../pvp/battle-route";
++import { campaignUpgradePath } from "../pvp/campaign-upgrade";
++import { applyBattlePlayer, type BattlePlayer } from "../pvp/battle-player";
+ 
+ const ErrorMessages = {
+   OUT_OF_DATE: i18next.t("gameData:reloadSaveData"),
+@@ -262,6 +267,9 @@ export class GameData {
+   }
+ 
+   public async saveSystem(): Promise<boolean> {
++    if (isPvpMatchActive()) {
++      return true;
++    }
+     const data = this.getSystemSaveData();
+ 
+     if (!this.validateSystemData(data)) {
+@@ -295,6 +303,23 @@ export class GameData {
+   }
+ 
+   public async loadSystem(): Promise<boolean> {
++    if (pvpEnabled && isBattleClient()) {
++      try {
++        const {pvpApi}=await import("../pvp/api");
++        const status=await pvpApi.request<{playerIdentity?:BattlePlayer}>("status");
++        applyBattlePlayer(this,status.playerIdentity);
++      } catch(error){console.warn("대전 플레이어 정보 확인 실패",error);applyBattlePlayer(this,undefined);}
++      return true;
++    }
++    if (pvpEnabled) {
++      try {
++        const path = await campaignUpgradePath();
++        if (path) { location.replace(path); return new Promise<boolean>(() => {}); }
++      } catch (error) {
++        await globalScene.ui.setMode(UiMode.ALERT_MODAL, `업데이트 호환 확인에 실패했습니다. 새로고침하여 다시 시도하세요.\n${String(error)}`);
++        return new Promise<boolean>(() => {});
++      }
++    }
+     console.log("Client Session:", clientSessionId);
+ 
+     if (bypassLogin && !localStorage.getItem(`data_${loggedInUser?.username}`)) {
+@@ -439,6 +464,12 @@ export class GameData {
+       }
+ 
+       if (!isDev && !isBeta && compareVersions(systemData.gameVersion, version) === 1) {
++        if(pvpEnabled){
++          const {pvpApi}=await import("../pvp/api");
++          const status=await pvpApi.request<{enginePaths?:Record<string,string>}>("status");
++          const path=status.enginePaths?.[systemData.gameVersion];
++          if(path){location.replace(path);return new Promise<boolean>(()=>{});}
++        }
+         await globalScene.ui.setMode(UiMode.ALERT_MODAL, ErrorMessages.GAME_OUT_OF_DATE);
+ 
+         globalScene.time.delayedCall(fixedInt(1000), () => {
+@@ -449,6 +480,9 @@ export class GameData {
+         return false;
+       }
+       this.initParsedSystem(systemData);
++      if (pvpEnabled && systemData.gameVersion !== version && Number(version.split(".")[2]) >= 2) {
++        return await this.saveSystem();
++      }
+       return true;
+     } catch (err) {
+       console.error(err);
+@@ -1072,6 +1106,10 @@ export class GameData {
+    * To delete an unfinished run instead, use {@linkcode deleteSession}
+    */
+   async tryClearSession(slotId: number): Promise<[success: boolean, newClear: boolean]> {
++    if (isPvpMatchActive()) {
++      return [true, false];
++    }
++    await finalizeRun(globalScene.seed).catch(err => console.warn("연승전 최종 앵커:", err));
+     const [success] = await updateUserInfo();
+     if (!success) {
+       return [false, false];
+@@ -1193,6 +1231,12 @@ export class GameData {
+     useCachedSession = false,
+     useCachedSystem = false,
+   ): Promise<boolean> {
++    if (isPvpMatchActive()) {
++      return true;
++    }
++    if (pvpEnabled && globalScene.currentBattle) {
++      await recordWave(this.getSessionSaveData(), sync).catch(err => console.warn("연승전 기록:", err));
++    }
+     if (!skipVerification) {
+       const [success] = await updateUserInfo();
+       if (!success) {

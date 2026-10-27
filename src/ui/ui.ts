@@ -1,0 +1,653 @@
+import { audioManager } from "#app/global-audio-manager";
+import { globalScene } from "#app/global-scene";
+import { settings } from "#app/global-settings-manager";
+import type { Button } from "#enums/buttons";
+import { Device } from "#enums/devices";
+import { PlayerGender } from "#enums/player-gender";
+import { TextStyle } from "#enums/text-style";
+import { UiMode } from "#enums/ui-mode";
+import { AchvBar } from "#ui/achv-bar";
+import { AchvsUiHandler } from "#ui/achvs-ui-handler";
+import { AdminUiHandler } from "#ui/admin-ui-handler";
+import { AlertModalUiHandler } from "#ui/alert-modal-ui-handler";
+import { SettingsAudioUiHandler } from "#ui/audio-settings-ui-handler";
+import { AutoCompleteUiHandler } from "#ui/autocomplete-ui-handler";
+import { AwaitableUiHandler } from "#ui/awaitable-ui-handler";
+import { BallUiHandler } from "#ui/ball-ui-handler";
+import { BattleMessageUiHandler } from "#ui/battle-message-ui-handler";
+import type { BgmBar } from "#ui/bgm-bar";
+import { GameChallengesUiHandler } from "#ui/challenges-select-ui-handler";
+import { ChangePasswordFormUiHandler } from "#ui/change-password-form-ui-handler";
+import { CommandUiHandler } from "#ui/command-ui-handler";
+import { ConfirmUiHandler } from "#ui/confirm-ui-handler";
+import { SettingsDisplayUiHandler } from "#ui/display-settings-ui-handler";
+import { EggGachaUiHandler } from "#ui/egg-gacha-ui-handler";
+import { EggHatchSceneUiHandler } from "#ui/egg-hatch-scene-ui-handler";
+import { EggListUiHandler } from "#ui/egg-list-ui-handler";
+import { EggSummaryUiHandler } from "#ui/egg-summary-ui-handler";
+import { EvolutionSceneUiHandler } from "#ui/evolution-scene-ui-handler";
+import { FightUiHandler } from "#ui/fight-ui-handler";
+import { GameStatsUiHandler } from "#ui/game-stats-ui-handler";
+import { GamepadBindingUiHandler } from "#ui/gamepad-binding-ui-handler";
+import { SettingsGamepadUiHandler } from "#ui/gamepad-settings-ui-handler";
+import { GeneralSettingsUiHandler } from "#ui/general-settings-ui-handler";
+import { KeyboardBindingUiHandler } from "#ui/keyboard-binding-ui-handler";
+import { SettingsKeyboardUiHandler } from "#ui/keyboard-settings-ui-handler";
+import { LoadingModalUiHandler } from "#ui/loading-modal-ui-handler";
+import { LoginFormUiHandler } from "#ui/login-form-ui-handler";
+import { LoginOrRegisterUiHandler } from "#ui/login-or-register-ui-handler";
+import { MenuUiHandler } from "#ui/menu-ui-handler";
+import { MessageUiHandler } from "#ui/message-ui-handler";
+import { ModifierSelectUiHandler } from "#ui/modifier-select-ui-handler";
+import { MysteryEncounterUiHandler } from "#ui/mystery-encounter-ui-handler";
+import { OptionSelectUiHandler } from "#ui/option-select-ui-handler";
+import { PartyUiHandler } from "#ui/party-ui-handler";
+import { PokedexPageUiHandler } from "#ui/pokedex-page-ui-handler";
+import { PokedexScanUiHandler } from "#ui/pokedex-scan-ui-handler";
+import { PokedexUiHandler } from "#ui/pokedex-ui-handler";
+import { RegistrationFormUiHandler } from "#ui/registration-form-ui-handler";
+import { RenameFormUiHandler } from "#ui/rename-form-ui-handler";
+import { RenameRunFormUiHandler } from "#ui/rename-run-ui-handler";
+import { RunHistoryUiHandler } from "#ui/run-history-ui-handler";
+import { RunInfoUiHandler } from "#ui/run-info-ui-handler";
+import { SaveSlotSelectUiHandler } from "#ui/save-slot-select-ui-handler";
+import { SavingIconContainer } from "#ui/saving-icon-handler";
+import { StarterSelectUiHandler } from "#ui/starter-select-ui-handler";
+import { SummaryUiHandler } from "#ui/summary-ui-handler";
+import { TargetSelectUiHandler } from "#ui/target-select-ui-handler";
+import { TestDialogueUiHandler } from "#ui/test-dialogue-ui-handler";
+import { addTextObject } from "#ui/text";
+import { TitleUiHandler } from "#ui/title-ui-handler";
+import type { UiHandler } from "#ui/ui-handler";
+import { addWindow } from "#ui/ui-theme";
+import { UnavailableModalUiHandler } from "#ui/unavailable-modal-ui-handler";
+import { executeIf } from "#utils/common";
+import i18next from "i18next";
+
+const transitionModes = [
+  UiMode.SAVE_SLOT,
+  UiMode.PARTY,
+  UiMode.SUMMARY,
+  UiMode.STARTER_SELECT,
+  UiMode.EVOLUTION_SCENE,
+  UiMode.EGG_HATCH_SCENE,
+  UiMode.EGG_LIST,
+  UiMode.EGG_GACHA,
+  UiMode.POKEDEX,
+  UiMode.POKEDEX_PAGE,
+  UiMode.CHALLENGE_SELECT,
+  UiMode.RUN_HISTORY,
+];
+
+const noTransitionModes = [
+  UiMode.TITLE,
+  UiMode.CONFIRM,
+  UiMode.OPTION_SELECT,
+  UiMode.MENU,
+  UiMode.MENU_OPTION_SELECT,
+  UiMode.GAMEPAD_BINDING,
+  UiMode.KEYBOARD_BINDING,
+  UiMode.SETTINGS_GENERAL,
+  UiMode.SETTINGS_AUDIO,
+  UiMode.SETTINGS_DISPLAY,
+  UiMode.SETTINGS_GAMEPAD,
+  UiMode.SETTINGS_KEYBOARD,
+  UiMode.ACHIEVEMENTS,
+  UiMode.GAME_STATS,
+  UiMode.POKEDEX_SCAN,
+  UiMode.LOGIN_FORM,
+  UiMode.REGISTRATION_FORM,
+  UiMode.LOADING,
+  UiMode.UNAVAILABLE,
+  UiMode.RENAME_POKEMON,
+  UiMode.RENAME_RUN,
+  UiMode.TEST_DIALOGUE,
+  UiMode.AUTO_COMPLETE,
+  UiMode.ADMIN,
+  UiMode.MYSTERY_ENCOUNTER,
+  UiMode.RUN_INFO,
+  UiMode.CHANGE_PASSWORD_FORM,
+  UiMode.ALERT_MODAL,
+];
+
+// biome-ignore lint/style/useNamingConvention: a unique case (only 2 letters)
+export class UI extends Phaser.GameObjects.Container {
+  private _mode: UiMode = UiMode.MESSAGE;
+  private _modeChain: UiMode[] = [];
+
+  private overlay: Phaser.GameObjects.Rectangle;
+  private tooltipContainer: Phaser.GameObjects.Container;
+  private tooltipBg: Phaser.GameObjects.NineSlice;
+  private tooltipTitle: Phaser.GameObjects.Text;
+  private tooltipContent: Phaser.GameObjects.Text;
+
+  private overlayActive: boolean;
+
+  public handlers: UiHandler[];
+
+  public achvBar: AchvBar;
+  public bgmBar: BgmBar;
+  public savingIcon: SavingIconContainer;
+
+  constructor() {
+    super(globalScene, 0, globalScene.scaledCanvas.height);
+
+    this.handlers = [
+      new BattleMessageUiHandler(),
+      new TitleUiHandler(),
+      new CommandUiHandler(),
+      new FightUiHandler(),
+      new BallUiHandler(),
+      new TargetSelectUiHandler(),
+      new ModifierSelectUiHandler(),
+      new SaveSlotSelectUiHandler(),
+      new PartyUiHandler(),
+      new SummaryUiHandler(),
+      new StarterSelectUiHandler(),
+      new EvolutionSceneUiHandler(),
+      new EggHatchSceneUiHandler(),
+      new EggSummaryUiHandler(),
+      new ConfirmUiHandler(),
+      new OptionSelectUiHandler(),
+      new MenuUiHandler(),
+      new OptionSelectUiHandler(UiMode.MENU_OPTION_SELECT),
+      // settings
+      new GeneralSettingsUiHandler(),
+      new SettingsDisplayUiHandler(),
+      new SettingsAudioUiHandler(),
+      new SettingsGamepadUiHandler(),
+      new GamepadBindingUiHandler(),
+      new SettingsKeyboardUiHandler(),
+      new KeyboardBindingUiHandler(),
+      // end settings
+      new AchvsUiHandler(),
+      new GameStatsUiHandler(),
+      new EggListUiHandler(),
+      new EggGachaUiHandler(),
+      new PokedexUiHandler(),
+      new PokedexScanUiHandler(),
+      new PokedexPageUiHandler(),
+      new LoginOrRegisterUiHandler(),
+      new LoginFormUiHandler(),
+      new RegistrationFormUiHandler(),
+      new LoadingModalUiHandler(),
+      new UnavailableModalUiHandler(),
+      new GameChallengesUiHandler(),
+      new RenameFormUiHandler(),
+      new RenameRunFormUiHandler(),
+      new RunHistoryUiHandler(),
+      new RunInfoUiHandler(),
+      new TestDialogueUiHandler(),
+      new AutoCompleteUiHandler(),
+      new AdminUiHandler(),
+      new MysteryEncounterUiHandler(),
+      new ChangePasswordFormUiHandler(),
+      new AlertModalUiHandler(),
+    ];
+  }
+
+  public get mode(): UiMode {
+    return this._mode;
+  }
+
+  public get modeChain(): UiMode[] {
+    return this._modeChain;
+  }
+
+  public setup(): void {
+    this.setName(`ui-${UiMode[this._mode]}`);
+    for (const handler of this.handlers) {
+      handler.setup();
+    }
+    this.overlay = globalScene.add.rectangle(0, 0, globalScene.scaledCanvas.width, globalScene.scaledCanvas.height, 0);
+    this.overlay.setName("rect-ui-overlay");
+    this.overlay.setOrigin(0, 0);
+    globalScene.uiContainer.add(this.overlay);
+    this.overlay.setVisible(false);
+    this.setupTooltip();
+
+    this.achvBar = new AchvBar();
+    this.achvBar.setup();
+
+    globalScene.uiContainer.add(this.achvBar);
+
+    this.savingIcon = new SavingIconContainer();
+    this.savingIcon.setup();
+
+    globalScene.uiContainer.add(this.savingIcon);
+  }
+
+  private setupTooltip() {
+    this.tooltipContainer = globalScene.add.container(0, 0);
+    this.tooltipContainer.setName("tooltip");
+    this.tooltipContainer.setVisible(false);
+
+    this.tooltipBg = addWindow(0, 0, 128, 31);
+    this.tooltipBg.setName("window-tooltip-bg");
+    this.tooltipBg.setOrigin(0, 0);
+
+    this.tooltipTitle = addTextObject(64, 4, "", TextStyle.TOOLTIP_TITLE);
+    this.tooltipTitle.setName("text-tooltip-title");
+    this.tooltipTitle.setOrigin(0.5, 0);
+
+    this.tooltipContent = addTextObject(6, 16, "", TextStyle.TOOLTIP_CONTENT);
+    this.tooltipContent.setName("text-tooltip-content");
+    this.tooltipContent.setWordWrapWidth(850);
+
+    this.tooltipContainer.add(this.tooltipBg);
+    this.tooltipContainer.add(this.tooltipTitle);
+    this.tooltipContainer.add(this.tooltipContent);
+
+    globalScene.uiContainer.add(this.tooltipContainer);
+  }
+
+  public getHandler<H extends UiHandler = UiHandler>(): H {
+    return this.handlers[this.mode] as H;
+  }
+
+  public getMessageHandler(): BattleMessageUiHandler {
+    return this.handlers[UiMode.MESSAGE] as BattleMessageUiHandler;
+  }
+
+  public getCurrentMessageHandler(): MessageUiHandler {
+    const handler = this.getHandler();
+    if (handler instanceof MessageUiHandler && handler.message) {
+      return handler;
+    }
+    return this.getMessageHandler();
+  }
+
+  public processInfoButton(pressed: boolean) {
+    if (this.overlayActive) {
+      return false;
+    }
+
+    if ([UiMode.CONFIRM, UiMode.COMMAND, UiMode.FIGHT, UiMode.MESSAGE, UiMode.TARGET_SELECT].includes(this._mode)) {
+      globalScene?.processInfoButton(pressed);
+      return true;
+    }
+    globalScene?.processInfoButton(false);
+    return true;
+  }
+
+  /**
+   * Process a player input of a button (delivering it to the current UI handler for processing)
+   * @param button The {@linkcode Button} being inputted
+   * @returns true if the input attempt succeeds
+   */
+  public processInput(button: Button): boolean {
+    if (this.overlayActive) {
+      return false;
+    }
+
+    const handler = this.getHandler();
+
+    if (handler instanceof AwaitableUiHandler && handler.tutorialActive) {
+      return handler.processTutorialInput(button);
+    }
+
+    return handler.processInput(button);
+  }
+
+  public showTextPromise(text: string, callbackDelay = 0, prompt = true, promptDelay?: number | null): Promise<void> {
+    return new Promise<void>(resolve => {
+      this.showText(text ?? "", null, () => resolve(), callbackDelay, prompt, promptDelay);
+    });
+  }
+
+  public showText(
+    text: string,
+    delay?: number | null,
+    callback?: (() => void) | null,
+    callbackDelay?: number | null,
+    prompt?: boolean | null,
+    promptDelay?: number | null,
+  ): void {
+    const pokename: string[] = [];
+    const repname = ["#POKEMON1", "#POKEMON2"];
+    for (let p = 0; p < globalScene.getPlayerField().length; p++) {
+      pokename.push(globalScene.getPlayerField()[p].getNameToRender());
+      text = text.split(pokename[p]).join(repname[p]);
+    }
+    if (prompt && text.indexOf("$") > -1) {
+      const messagePages = text.split(/\$/g).map(m => m.trim());
+      let showMessageAndCallback = () => callback?.();
+      for (let p = messagePages.length - 1; p >= 0; p--) {
+        const originalFunc = showMessageAndCallback;
+        messagePages[p] = messagePages[p].split(repname[0]).join(pokename[0]);
+        messagePages[p] = messagePages[p].split(repname[1]).join(pokename[1]);
+        showMessageAndCallback = () => this.showText(messagePages[p], null, originalFunc, null, true);
+      }
+      showMessageAndCallback();
+    } else {
+      for (let p = 0; p < globalScene.getPlayerField().length; p++) {
+        text = text.split(repname[p]).join(pokename[p]);
+      }
+      this.getCurrentMessageHandler().showText(text, delay, callback, callbackDelay, prompt, promptDelay);
+    }
+  }
+
+  public showDialogue(
+    keyOrText: string,
+    name: string | undefined,
+    delay: number | null = 0,
+    callback: () => void,
+    callbackDelay?: number,
+    promptDelay?: number,
+  ): void {
+    // Get localized dialogue (if available)
+    let hasi18n = false;
+    let text = keyOrText;
+    const genderIndex = settings.general.playerGender;
+    const genderStr = PlayerGender[genderIndex].toLowerCase();
+
+    if (i18next.exists(keyOrText)) {
+      const i18nKey = keyOrText;
+      hasi18n = true;
+
+      text = i18next.t(i18nKey, { context: genderStr }); // override text with translation
+
+      // Skip dialogue if the player has enabled the option and the dialogue has been already seen
+      if (this.shouldSkipDialogue(i18nKey)) {
+        console.log(`Dialogue ${i18nKey} skipped`);
+        callback();
+        return;
+      }
+    }
+    let showMessageAndCallback = () => {
+      hasi18n && globalScene.gameData.saveSeenDialogue(keyOrText);
+      callback();
+    };
+    if (text.indexOf("$") > -1) {
+      const messagePages = text.split(/\$/g).map(m => m.trim());
+      for (let p = messagePages.length - 1; p >= 0; p--) {
+        const originalFunc = showMessageAndCallback;
+        showMessageAndCallback = () => this.showDialogue(messagePages[p], name, null, originalFunc);
+      }
+      showMessageAndCallback();
+    } else {
+      this.getCurrentMessageHandler().showDialogue(
+        text,
+        name,
+        delay,
+        showMessageAndCallback,
+        callbackDelay,
+        true,
+        promptDelay,
+      );
+    }
+  }
+
+  public shouldSkipDialogue(i18nKey: string): boolean {
+    if (
+      i18next.exists(i18nKey)
+      && settings.general.skipSeenDialogues
+      && globalScene.gameData.getSeenDialogues()[i18nKey] === true
+    ) {
+      return true;
+    }
+    return false;
+  }
+
+  public getTooltip(): { visible: boolean; title: string; content: string } {
+    return {
+      visible: this.tooltipContainer.visible,
+      title: this.tooltipTitle.text,
+      content: this.tooltipContent.text,
+    };
+  }
+
+  public showTooltip(title: string, content: string, overlap?: boolean): void {
+    this.tooltipContainer.setVisible(true);
+    this.editTooltip(title, content);
+    if (overlap) {
+      globalScene.uiContainer.moveAbove(this.tooltipContainer, this);
+    } else {
+      globalScene.uiContainer.moveBelow(this.tooltipContainer, this);
+    }
+  }
+
+  public editTooltip(title: string, content: string): void {
+    this.tooltipTitle.setText(title || "");
+    const wrappedContent = this.tooltipContent.runWordWrap(content);
+    this.tooltipContent.setText(wrappedContent);
+    this.tooltipContent.y = title ? 16 : 4;
+    this.tooltipBg.width = Math.min(
+      Math.max(this.tooltipTitle.displayWidth, this.tooltipContent.displayWidth) + 12,
+      838,
+    );
+    this.tooltipBg.height = (title ? 31 : 19) + 10.5 * (wrappedContent.split("\n").length - 1);
+    this.tooltipTitle.x = this.tooltipBg.width / 2;
+  }
+
+  public hideTooltip(): void {
+    this.tooltipContainer.setVisible(false);
+    this.tooltipTitle.clearTint();
+  }
+
+  public override update(): void {
+    if (this.tooltipContainer.visible) {
+      const isTouch = globalScene.inputMethod === "touch";
+      const pointerX = globalScene.game.input.activePointer.x;
+      const pointerY = globalScene.game.input.activePointer.y;
+      const tooltipWidth = this.tooltipBg.width;
+      const tooltipHeight = this.tooltipBg.height;
+      const padding = 2;
+
+      // Default placement is top left corner of the screen on mobile. Otherwise below the cursor, to the right
+      let x = isTouch ? padding : pointerX / 6 + padding;
+      let y = isTouch ? padding : pointerY / 6 + padding;
+
+      if (isTouch) {
+        // If we are in the top left quadrant on mobile, move the tooltip to the top right corner
+        if (pointerX <= globalScene.game.canvas.width / 2 && pointerY <= globalScene.game.canvas.height / 2) {
+          x = globalScene.scaledCanvas.width - tooltipWidth - padding;
+        }
+      } else {
+        // If the tooltip would go offscreen on the right, or is close to it, move to the left of the cursor
+        if (x + tooltipWidth + padding > globalScene.scaledCanvas.width) {
+          x = Math.max(padding, pointerX / 6 - tooltipWidth - padding);
+        }
+        // If the tooltip would go offscreen at the bottom, or is close to it, move above the cursor
+        if (y + tooltipHeight + padding > globalScene.scaledCanvas.height) {
+          y = Math.max(padding, pointerY / 6 - tooltipHeight - padding);
+        }
+      }
+
+      this.tooltipContainer.setPosition(x, y);
+    }
+  }
+
+  public clearText(): void {
+    this.getCurrentMessageHandler().clearText();
+  }
+
+  public setCursor(cursor: number): boolean {
+    const changed = this.getHandler().setCursor(cursor);
+    if (changed) {
+      this.playSelect();
+    }
+
+    return changed;
+  }
+
+  public playSelect(): void {
+    audioManager.playSound("ui/select");
+  }
+
+  public playError(): void {
+    audioManager.playSound("ui/error");
+  }
+
+  public fadeOut(duration: number): Promise<void> {
+    return new Promise(resolve => {
+      if (this.overlayActive) {
+        return resolve();
+      }
+      this.overlayActive = true;
+      this.overlay.setAlpha(0);
+      this.overlay.setVisible(true);
+      globalScene.tweens.add({
+        targets: this.overlay,
+        alpha: 1,
+        duration,
+        ease: "Sine.easeOut",
+        onComplete: () => resolve(),
+      });
+    });
+  }
+
+  public fadeIn(duration: number): Promise<void> {
+    return new Promise(resolve => {
+      if (!this.overlayActive) {
+        return resolve();
+      }
+      globalScene.tweens.add({
+        targets: this.overlay,
+        alpha: 0,
+        duration,
+        ease: "Sine.easeIn",
+        onComplete: () => {
+          this.overlay.setVisible(false);
+          resolve();
+        },
+      });
+      this.overlayActive = false;
+    });
+  }
+
+  private setModeInternal(
+    this: UI,
+    mode: UiMode,
+    clear: boolean,
+    forceTransition: boolean,
+    chainMode: boolean,
+    args: any[],
+  ): Promise<void> {
+    return new Promise(resolve => {
+      if (this._mode === mode && !forceTransition) {
+        resolve();
+        return;
+      }
+      const doSetMode = () => {
+        if (this._mode !== mode) {
+          if (clear) {
+            this.getHandler().clear();
+          }
+          if (chainMode && this._mode && !clear) {
+            this._modeChain.push(this._mode);
+            globalScene.updateGameInfo();
+          }
+          this._mode = mode;
+          const touchControls = document?.getElementById("touchControls");
+          if (touchControls) {
+            touchControls.dataset.uiMode = UiMode[mode];
+          }
+          this.getHandler().show(args);
+        }
+        resolve();
+      };
+      if (
+        (!chainMode
+          && (transitionModes.includes(this._mode) || transitionModes.includes(mode))
+          && !noTransitionModes.includes(this._mode)
+          && !noTransitionModes.includes(mode))
+        || (chainMode && !noTransitionModes.includes(mode))
+      ) {
+        this.fadeOut(250).then(() => {
+          globalScene.time.delayedCall(100, () => {
+            doSetMode();
+            this.fadeIn(250);
+          });
+        });
+      } else {
+        doSetMode();
+      }
+    });
+  }
+
+  public setMode(mode: UiMode, ...args: any[]): Promise<void> {
+    return this.setModeInternal(mode, true, false, false, args);
+  }
+
+  public setModeForceTransition(mode: UiMode, ...args: any[]): Promise<void> {
+    return this.setModeInternal(mode, true, true, false, args);
+  }
+
+  public setModeWithoutClear(mode: UiMode, ...args: any[]): Promise<void> {
+    return this.setModeInternal(mode, false, false, false, args);
+  }
+
+  public setOverlayMode(mode: UiMode, ...args: any[]): Promise<void> {
+    return this.setModeInternal(mode, false, false, true, args);
+  }
+
+  public resetModeChain(): void {
+    this._modeChain = [];
+    globalScene.updateGameInfo();
+  }
+
+  public revertMode(): Promise<boolean> {
+    return new Promise<boolean>(resolve => {
+      if (this?._modeChain?.length === 0) {
+        return resolve(false);
+      }
+
+      const lastMode = this._mode;
+
+      const doRevertMode = () => {
+        this.getHandler().clear();
+        this._mode = this._modeChain.pop()!; // TODO: is this bang correct?
+        globalScene.updateGameInfo();
+        const touchControls = document.getElementById("touchControls");
+        if (touchControls) {
+          touchControls.dataset.uiMode = UiMode[this._mode];
+        }
+        resolve(true);
+      };
+
+      if (noTransitionModes.indexOf(lastMode) === -1) {
+        this.fadeOut(250).then(() => {
+          globalScene.time.delayedCall(100, () => {
+            doRevertMode();
+            this.fadeIn(250);
+          });
+        });
+      } else {
+        doRevertMode();
+      }
+    });
+  }
+
+  public revertModes(): Promise<void> {
+    return new Promise<void>(resolve => {
+      if (this?._modeChain?.length === 0) {
+        return resolve();
+      }
+      this.revertMode().then(success => executeIf(success, this.revertModes).then(() => resolve()));
+    });
+  }
+
+  /**
+   * getGamepadType - returns the type of gamepad being used
+   * inputMethod could be "keyboard" or "touch" or "gamepad"
+   * if inputMethod is "keyboard" or "touch", then the inputMethod is returned
+   * if inputMethod is "gamepad", then the gamepad type is returned (e.g. "xbox", "dualshock", or "procon")
+   * @returns gamepad type
+   */
+  public getGamepadType(): string {
+    if (globalScene.inputMethod === "gamepad") {
+      // TODO: is this bang correct?
+      return globalScene.inputController.getConfig(globalScene.inputController.selectedDevice[Device.GAMEPAD]!).padType;
+    }
+    return globalScene.inputMethod;
+  }
+
+  /**
+   * Attempts to free memory held by UI handlers
+   */
+  public freeUIData(): void {
+    this.handlers.forEach(h => h.destroy());
+    this.handlers = [];
+  }
+}

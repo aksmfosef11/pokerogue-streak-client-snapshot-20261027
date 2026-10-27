@@ -1,0 +1,197 @@
+{
+  "decisions": [
+    {
+      "choice": {
+        "command": {
+          "args": [
+            1,
+            null,
+          ],
+          "command": 0,
+          "cursor": 0,
+          "move": {
+            "move": 14,
+            "targets": [
+              0,
+            ],
+            "useMode": 1,
+          },
+        },
+      },
+      "digest": "28439c1f8ee4f871c6cdaa1037c29561a0ab3655e13239ea033e76976ef26c3d",
+      "index": 0,
+      "kind": "turn",
+      "matchId": "native-victory",
+      "seed": "48c31ecba613e474d5a34c571fd3558cf2359bd5bb6a1b29a819acde6e144676",
+    },
+    {
+      "choice": {
+        "command": {
+          "args": [
+            1,
+            null,
+          ],
+          "command": 0,
+          "cursor": 1,
+          "move": {
+            "move": 226,
+            "targets": [
+              0,
+            ],
+            "useMode": 1,
+          },
+        },
+      },
+      "digest": "256f1c421e0f4ffe478cd391b23a0fe9e25457405322dcf0774bc69764f41416",
+      "index": 1,
+      "kind": "turn",
+      "matchId": "native-victory",
+      "seed": "e115e9f77f82e0e8cc338151c538977fcac9ef7df932b84633d52351d06f08f6",
+    },
+    {
+      "choice": {
+        "option": 0,
+        "slotIndex": 1,
+      },
+      "digest": "e2dadf69f5e9d69b5f009a2d45d18c04eac8041e82b0e09342eace39aa54f318",
+      "index": 2,
+      "kind": "switch",
+      "matchId": "native-victory",
+      "seed": "841f97a2158af75cc8737115ce5841bba5f101bf665c57aa025b13d540032486",
+    },
+    {
+      "choice": {
+        "command": {
+          "args": [
+            1,
+            null,
+          ],
+          "command": 0,
+          "cursor": 0,
+          "move": {
+            "move": 33,
+            "targets": [
+              2,
+            ],
+            "useMode": 1,
+          },
+        },
+      },
+      "digest": "8d93fba9dbe44116d0b3ddc0c532a056edcf45cab45e496c2e981cca9cf8d5ff",
+      "index": 3,
+      "kind": "turn",
+      "matchId": "native-victory",
+      "seed": "5c0db3087c7ce4b267b00f76238af14fd2ed384bfd757241d4d63274b8ed58f7",
+    },
+    {
+      "choice": {
+        "command": {
+          "args": [
+            1,
+            null,
+          ],
+          "command": 0,
+          "cursor": 0,
+          "move": {
+            "move": 33,
+            "targets": [
+              2,
+            ],
+            "useMode": 1,
+          },
+        },
+      },
+      "digest": "d239a56b1c5165e9c6ad3f425800884f5574aabc3bbcf5973eae05997338b515",
+      "index": 4,
+      "kind": "turn",
+      "matchId": "native-victory",
+      "seed": "a96c25b562704b68910f76a231f603ad411d8ae9355a84204526fa9f29dd0379",
+    },
+    {
+      "choice": {
+        "command": {
+          "args": [
+            1,
+            null,
+          ],
+          "command": 0,
+          "cursor": 0,
+          "move": {
+            "move": 33,
+            "targets": [
+              2,
+            ],
+            "useMode": 1,
+          },
+        },
+      },
+      "digest": "7ca07956c14d49d2f8ca3ddb45dccf5b096bfd7797a91c82d45a6dd5fefb9536",
+      "index": 5,
+      "kind": "turn",
+      "matchId": "native-victory",
+      "seed": "d7e6da403c9fa8d347be15eb1c4db7255393a7beb81b2c6dde20be8c794d7632",
+    },
+  ],
+  "transcript": [
+    {
+      "digest": "fd6bcc5e6cd3f4821bcc5f3bee06546b10f4fd292d157a9ffc78765c2c3be533",
+      "hp": [
+        590,
+        584,
+        588,
+        24,
+        24,
+        24,
+      ],
+      "turn": 1,
+    },
+    {
+      "digest": "472f39560c86561d6efe1d94d2aa91702f32de98de7da642ad72899f05ed117a",
+      "hp": [
+        582,
+        590,
+        588,
+        24,
+        24,
+        24,
+      ],
+      "turn": 2,
+    },
+    {
+      "digest": "aa4ad681d23cbe049f93d0cce2e452c3d004aad1251a4cea97410ffcfe55200f",
+      "hp": [
+        582,
+        590,
+        588,
+        0,
+        24,
+        24,
+      ],
+      "turn": 3,
+    },
+    {
+      "digest": "0752a40005b61ffff39a5072a1969f8244b584a28090183b639c4fb74612875e",
+      "hp": [
+        582,
+        590,
+        588,
+        0,
+        0,
+        24,
+      ],
+      "turn": 4,
+    },
+    {
+      "digest": "afcee44980aeba1b973da17171b3baaffbd3a65a23a98e605b133b2fb1081e8c",
+      "hp": [
+        582,
+        590,
+        588,
+        0,
+        0,
+        0,
+      ],
+      "turn": 5,
+    },
+  ],
+}

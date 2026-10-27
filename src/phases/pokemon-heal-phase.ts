@@ -1,0 +1,197 @@
+import { globalScene } from "#app/global-scene";
+import { getPokemonNameWithAffix } from "#app/messages";
+import { getStatusEffectHealText } from "#data/status-effect";
+import type { BattlerIndex } from "#enums/battler-index";
+import { BattlerTagType } from "#enums/battler-tag-type";
+import { HitResult } from "#enums/hit-result";
+import { CommonAnim } from "#enums/move-anims-common";
+import { HealingBoosterModifier } from "#modifiers/modifier";
+import { CommonAnimPhase } from "#phases/common-anim-phase";
+import { HealAchv } from "#system/achv";
+import { toDmgValue } from "#utils/common";
+import { ValueHolder } from "#utils/value-holder";
+import i18next from "i18next";
+
+// TODO: Refactor this - it has far too many arguments
+export class PokemonHealPhase extends CommonAnimPhase {
+  public readonly phaseName = "PokemonHealPhase";
+
+  /** The base amount of HP to heal. */
+  private readonly hpHealed: number;
+  /**
+   * The message to display upon healing the target, or `undefined` to show no message. \
+   * Will be overridden by the full HP message if {@linkcode showFullHpMessage} is set to `true`.
+   */
+  private message: string | undefined;
+  /**
+   * Whether to show a failure message upon healing a Pokemon already at full HP.
+   * @defaultValue `true`
+   */
+  private readonly showFullHpMessage: boolean;
+  /**
+   * Whether to skip showing the healing animation.
+   * @defaultValue `false`
+   */
+  private readonly skipAnim: boolean;
+  /**
+   * Whether to revive the affected Pokemon in addition to healing. \
+   * Revives will not be affected by any Healing Charms.
+   * @defaultValue `false`
+   */
+  // TODO: Remove post modifier rework as items should not be using phases to heal statuses
+  // (which is exclusively where it is used at the moment)
+  private readonly revive: boolean;
+  /**
+   * Whether to heal the affected Pokemon's status condition.
+   * @defaultValue `false`
+   */
+  // TODO: This should debatably not be the job of a phase designed solely to restore HP
+  private readonly healStatus: boolean;
+  /**
+   * Whether to prevent fully healing affected Pokemon, leaving them 1 HP below full instead.
+   * @defaultValue `false`
+   */
+  private readonly preventFullHeal: boolean;
+  /**
+   * Whether to fully restore PP upon healing.
+   * Used solely for Lunar Dance.
+   * @defaultValue `false`
+   */
+  // TODO: This should arguably not be the healing phase's job
+  // (and can be handled fairly easily by the calling code)
+  private readonly fullRestorePP: boolean;
+
+  constructor(
+    battlerIndex: BattlerIndex,
+    hpHealed: number,
+    {
+      message,
+      showFullHpMessage = true,
+      skipAnim = false,
+      revive = false,
+      healStatus = false,
+      preventFullHeal = false,
+      fullRestorePP = false,
+    }: {
+      message?: string;
+      showFullHpMessage?: boolean;
+      skipAnim?: boolean;
+      revive?: boolean;
+      healStatus?: boolean;
+      preventFullHeal?: boolean;
+      fullRestorePP?: boolean;
+    } = {},
+  ) {
+    super(battlerIndex, undefined, CommonAnim.HEALTH_UP);
+
+    this.hpHealed = hpHealed;
+    this.message = message;
+    this.showFullHpMessage = showFullHpMessage;
+    this.skipAnim = skipAnim;
+    this.revive = revive;
+    this.healStatus = healStatus;
+    this.preventFullHeal = preventFullHeal;
+    this.fullRestorePP = fullRestorePP;
+  }
+
+  public override start(): void {
+    if (!this.skipAnim && !this.getPokemon().isFullHp()) {
+      super.start();
+    } else {
+      this.end();
+    }
+  }
+
+  // NB: Placing this stuff directly inside `end` is required as
+  // `CommonAnimPhase` calls `this.end` once the animation finishes.
+  // TODO: refactor this bizarre control flow to make sense
+  public override async end(): Promise<void> {
+    await this.heal();
+    super.end();
+  }
+
+  /** Queue healing animations for the Pokemon affected by this Phase. */
+  private async heal(): Promise<void> {
+    const pokemon = this.getPokemon();
+
+    // TODO: Revival effects shouldn't use this phase
+    if (!this.revive && !pokemon.isActive(true)) {
+      return;
+    }
+
+    // TODO: Heal Block should probably be checked via `applyTags`
+    const healBlock = pokemon.getTag(BattlerTagType.HEAL_BLOCK);
+    if (healBlock && this.hpHealed > 0) {
+      globalScene.phaseManager.queueMessage(healBlock.onActivation(pokemon));
+      return;
+    }
+
+    this.doHealPokemon();
+
+    // TODO: Curing status should arguably not be the job of this phase
+    if (this.healStatus && pokemon.status) {
+      this.message = getStatusEffectHealText(pokemon.status.effect, getPokemonNameWithAffix(pokemon));
+      pokemon.resetStatus();
+    }
+
+    // TODO: Restoring PP should arguably not be the job of this phase
+    if (this.fullRestorePP) {
+      for (const move of pokemon.getMoveset()) {
+        move.ppUsed = 0;
+      }
+    }
+
+    if (this.message) {
+      globalScene.phaseManager.queueMessage(this.message);
+    }
+    await pokemon.updateInfo();
+  }
+
+  /** Heal the Pokemon affected by this Phase. */
+  private doHealPokemon(): void {
+    const pokemon = this.getPokemon()!;
+
+    if (this.hpHealed > 0 && pokemon.isFullHp()) {
+      if (this.showFullHpMessage) {
+        this.message = i18next.t("battle:hpIsFull", { pokemonName: getPokemonNameWithAffix(pokemon) });
+      }
+      return;
+    }
+
+    const healAmount = this.getHealAmount();
+
+    if (healAmount < 0) {
+      // TODO: Consider refactoring liquid ooze to not use a heal phase to do damage
+      pokemon.damageAndUpdate(-healAmount, { result: HitResult.INDIRECT });
+      return;
+    }
+
+    pokemon.heal(healAmount);
+    globalScene.damageNumberHandler.add(pokemon, healAmount, HitResult.HEAL);
+    if (pokemon.isPlayer()) {
+      globalScene.validateAchvs(HealAchv, healAmount);
+      globalScene.gameData.gameStats.highestHeal = Math.max(globalScene.gameData.gameStats.highestHeal, healAmount);
+    }
+  }
+
+  /**
+   * Calculate the amount of HP to be healed during this Phase.
+   * @returns The updated healing amount post-modifications, capped at the Pokemon's maximum HP.
+   * @remarks
+   * The effect of Healing Charms is rounded down for parity with the closest mainline counterpart
+   * (e.g. Big Root).
+   */
+  private getHealAmount(): number {
+    if (this.revive) {
+      return toDmgValue(this.hpHealed);
+    }
+
+    // Apply the effect of healing charms for non-revival items before rounding down and capping at max HP
+    // (or 1 below max for healing tokens).
+    // Liquid Ooze damage (being negative) remains uncapped as normal.
+    const healMult = new ValueHolder(1);
+    globalScene.applyModifiers(HealingBoosterModifier, this.player, healMult);
+    // TODO: we need to round liquid ooze dmg towards 0, not down
+    return Math.min(Math.floor(this.hpHealed * healMult.value), this.getPokemon().getMaxHp() - +this.preventFullHeal);
+  }
+}

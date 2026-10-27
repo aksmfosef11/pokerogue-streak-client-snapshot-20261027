@@ -1,0 +1,15 @@
+FROM node:24-alpine AS build
+WORKDIR /app
+RUN corepack enable && corepack prepare pnpm@10.34.5 --activate
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY patches ./patches
+RUN pnpm install --frozen-lockfile --ignore-scripts
+COPY . .
+ENV VITE_BYPASS_LOGIN=0 VITE_BYPASS_TUTORIAL=1 VITE_SERVER_URL=/api VITE_PVP_ENABLED=1 VITE_GITHUB_URL=https://github.com/aksmfosef11/pokerogue-streak-client VITE_WIKI_URL=https://wiki.pokerogue.net/start VITE_DISCORD_URL= VITE_REDDIT_URL= VITE_DONATE_URL=
+RUN pnpm exec tsc && pnpm exec vite build --config vite.pvp.config.ts
+FROM nginx:alpine
+COPY pvp.nginx.conf /etc/nginx/conf.d/default.conf
+COPY assets /usr/share/nginx/html
+COPY locales /usr/share/nginx/html/locales
+COPY --from=build /app/dist /usr/share/nginx/html
+EXPOSE 80

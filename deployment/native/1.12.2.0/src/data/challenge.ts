@@ -1,0 +1,1816 @@
+import type { FixedBattleConfig } from "#app/battle";
+import { getRandomTrainerFunc } from "#app/battle";
+import type { GameMode } from "#app/game-mode";
+import { globalScene } from "#app/global-scene";
+import { speciesDataRegistry } from "#app/global-species-data-registry";
+import { EvoCondKey, type SpeciesFormEvolution } from "#balance/pokemon-evolutions";
+import { tmPoolTiers } from "#balance/tm-pool-tiers";
+import { allAbilities, allMoves } from "#data/data-lists";
+import type { PokemonSpecies, PokemonSpeciesForm } from "#data/pokemon-species";
+import { AbilityAttr } from "#enums/ability-attr";
+import { AbilityId } from "#enums/ability-id";
+import { BattleType } from "#enums/battle-type";
+import { ChallengeCategory } from "#enums/challenge-category";
+import { Challenges } from "#enums/challenges";
+import { TypeColor, TypeShadow } from "#enums/color";
+import { DexAttr } from "#enums/dex-attr";
+import { ClassicFixedBossWaves } from "#enums/fixed-boss-waves";
+import { LearnMoveSituation } from "#enums/learn-move-situation";
+import { ModifierTier } from "#enums/modifier-tier";
+import { MoveId } from "#enums/move-id";
+import type { MoveSourceType } from "#enums/move-source-type";
+import { MysteryEncounterType } from "#enums/mystery-encounter-type";
+import { Nature } from "#enums/nature";
+import { PokemonType, type RegularPokemonType } from "#enums/pokemon-type";
+import { SpeciesId } from "#enums/species-id";
+import { TrainerType } from "#enums/trainer-type";
+import { TrainerVariant } from "#enums/trainer-variant";
+import { UiMode } from "#enums/ui-mode";
+import type { EnemyPokemon, PlayerPokemon, Pokemon } from "#field/pokemon";
+import { Trainer } from "#field/trainer";
+import type { ModifierTypeOption } from "#modifiers/modifier-type";
+import { PokemonMove } from "#moves/pokemon-move";
+import type { GameData } from "#system/game-data";
+import { RibbonData, type RibbonFlag } from "#system/ribbon-data";
+import type { DexEntry } from "#types/dex-data";
+import type { LevelMoves } from "#types/level-moves";
+import type { DexAttrProps, StarterDataEntry } from "#types/save-data";
+import { type BooleanHolder, isBetween, type NumberHolder, randSeedItem, randSeedShuffle } from "#utils/common";
+import { deepCopy } from "#utils/data";
+import { getEnumValues } from "#utils/enums";
+import { getPokemonTypeLocaleKey } from "#utils/i18n";
+import { toCamelCase } from "#utils/strings";
+import type { ValueHolder } from "#utils/value-holder";
+import i18next from "i18next";
+import type { Constructor, Jsonify } from "type-fest";
+
+/** A constant for the default max cost of the starting party before a run */
+const DEFAULT_PARTY_MAX_COST = 10;
+
+type ChallengeCondition = (data: GameData) => boolean;
+
+export abstract class Challenge {
+  /** The id of the challenge */
+  public readonly id: Challenges;
+
+  /** The "strength" of the challenge, all challenges have a numerical value. */
+  public value = 0;
+  /** The maximum strength of the challenge. */
+  public readonly maxValue: number;
+  /** The current severity of the challenge. Some challenges have multiple severities in addition to strength. */
+  public severity = 0;
+  /** The maximum severity of the challenge. */
+  public readonly maxSeverity = 0;
+
+  public conditions: ChallengeCondition[] = [];
+
+  /**
+   * The Ribbon awarded on challenge completion, or 0 if the challenge has no ribbon or is not enabled
+   *
+   * @defaultValue 0
+   */
+  public get ribbonAwarded(): RibbonFlag {
+    return 0n as RibbonFlag;
+  }
+
+  /** The category of the challenge for grouping in the UI. */
+  public abstract get category(): ChallengeCategory;
+
+  /** The localised name of this challenge. */
+  public get name(): string {
+    return i18next.t(`challenges:${this.i18nKey}.name`);
+  }
+
+  /** The difficulty value of this challenge. */
+  public get difficulty(): number {
+    return this.value;
+  }
+
+  /** The minimum difficulty value of this challenge. */
+  public get minDifficulty(): number {
+    return 0;
+  }
+
+  /** The i18n key for this challenge */
+  private get i18nKey(): string {
+    return toCamelCase(Challenges[this.id]);
+  }
+
+  /**
+   * @param id - The enum value for the challenge
+   */
+  constructor(id: Challenges, maxValue: number = Number.MAX_SAFE_INTEGER) {
+    this.id = id;
+
+    this.maxValue = maxValue;
+  }
+
+  /** Reset the challenge to a base state. */
+  public reset(): void {
+    this.value = 0;
+    this.severity = 0;
+  }
+
+  /**
+   * Check if an unlockable challenge is unlocked
+   * @param data - The save data
+   * @returns Whether this challenge is unlocked
+   */
+  public isUnlocked(data: GameData): boolean {
+    return this.conditions.every(f => f(data));
+  }
+
+  /**
+   * Adds an unlock condition to this challenge.
+   * @param condition - The condition to add
+   * @returns This challenge
+   */
+  public condition(condition: ChallengeCondition): Challenge {
+    this.conditions.push(condition);
+
+    return this;
+  }
+
+  /**
+   * Return the textual representation of a challenge's current value.
+   * @param overrideValue - (Default `this.value`) Overrides the value used
+   * @returns The localised text for the current value.
+   */
+  public getValue(overrideValue: number = this.value): string {
+    return i18next.t(`challenges:${this.i18nKey}.value.${overrideValue}`);
+  }
+
+  /**
+   * Return the description of a challenge's current value.
+   * @param overrideValue - (Default `this.value`) Overrides the value used
+   * @returns The localised description for the current value.
+   */
+  // TODO: Do we need an override value here? it's currently unused
+  public getDescription(overrideValue: number = this.value): string {
+    return `${i18next.t([`challenges:${this.i18nKey}.desc.${overrideValue}`, `challenges:${this.i18nKey}.desc`])}`;
+  }
+
+  /**
+   * Increase the value of the challenge
+   * @returns Whether the value changed
+   * @sealed
+   */
+  public increaseValue(): boolean {
+    if (this.value < this.maxValue) {
+      this.value = Math.min(this.value + 1, this.maxValue);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Decrease the value of the challenge
+   * @returns Whether the value changed
+   * @sealed
+   */
+  public decreaseValue(): boolean {
+    if (this.value > 0) {
+      this.value = Math.max(this.value - 1, 0);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Whether to allow choosing this challenge's severity.
+   * @sealed
+   */
+  public hasSeverity(): boolean {
+    return this.value !== 0 && this.maxSeverity > 0;
+  }
+
+  /**
+   * Decrease the severity of the challenge
+   * @returns Whether the value changed
+   * @sealed
+   */
+  public decreaseSeverity(): boolean {
+    if (this.severity > 0) {
+      this.severity = Math.max(this.severity - 1, 0);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Increase the severity of the challenge
+   * @returns Whether the value changed
+   * @sealed
+   */
+  public increaseSeverity(): boolean {
+    if (this.severity < this.maxSeverity) {
+      this.severity = Math.min(this.severity + 1, this.maxSeverity);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Clones a challenge, either from another challenge or json.
+   * @param source - The source challenge or json.
+   * @returns This challenge.
+   */
+  // TODO: remove `| any`
+  public static loadChallenge(source: Challenge | any): Challenge {
+    const c = source as Jsonify<Challenge>;
+    const challenge = getChallenge(c.id);
+    challenge.value = c.value;
+    challenge.severity = c.severity;
+    return challenge;
+  }
+
+  // TODO: Refactor the class hierarchy to remove the need for having all these methods on every class
+  // biome-ignore-start lint/correctness/noUnusedFunctionParameters: pseudo-abstract methods
+
+  /**
+   * Modifies the availability of starters.
+   * @param species - The Pokémon to check the validity of
+   * @param isValid - Holder for whether the Pokémon is valid or not
+   * @param dexAttr - The dex attributes of the Pokémon
+   * @returns Whether this function did anything.
+   */
+  applyStarterChoice(species: PokemonSpecies, isValid: BooleanHolder, dexAttr: DexAttrProps): boolean {
+    return false;
+  }
+
+  /**
+   * Modifies the maximum points available for the player to spend on starters.
+   * @param points - Holder for amount of starter points the user has to spend
+   * @returns Whether this function did anything
+   */
+  applyStarterPoints(points: NumberHolder): boolean {
+    return false;
+  }
+
+  /**
+   * Modifies the cost of starters.
+   * @param speciesId - The pokémon to change the cost of
+   * @param cost - Holder for the cost of the starter Pokémon
+   * @returns Whether this function did anything.
+   */
+  applyStarterCost(speciesId: SpeciesId, cost: NumberHolder): boolean {
+    return false;
+  }
+
+  /**
+   * Modifies the dex and/or starter data of starters.
+   * @param speciesId - The id of the starter Pokémon to modify.
+   * @param dexEntry - The starter's dex entry
+   * @param starterDataEntry - The starter's data
+   * @returns Whether this function did anything.
+   */
+  applyStarterSelectModify(speciesId: SpeciesId, dexEntry: DexEntry, starterDataEntry: StarterDataEntry): boolean {
+    return false;
+  }
+
+  /**
+   * Modifies the data of chosen starters.
+   * @param pokemon - The starter Pokémon to modify.
+   * @returns Whether this function did anything.
+   */
+  applyStarterModify(pokemon: Pokemon): boolean {
+    return false;
+  }
+
+  /**
+   * Modifies which pokemon are allowed in battle.
+   * @param pokemon - The Pokémon to check the validity of
+   * @param isValid - Holds a boolean that will be set to `false` if the Pokémon isn't allowed
+   * @returns Whether this function did anything
+   */
+  applyPokemonInBattle(pokemon: Pokemon, isValid: BooleanHolder): boolean {
+    return false;
+  }
+
+  /**
+   * Modifies fixed battles (e.g. Gym Leaders).
+   * @param waveIndex The current wave index
+   * @param battleConfig - The battle config to modify
+   * @returns Whether this function did anything
+   */
+  applyFixedBattle(waveIndex: number, battleConfig: FixedBattleConfig): boolean {
+    return false;
+  }
+
+  /**
+   * Modifies the type chart (e.g. changing which types are effective against which).
+   * @param effectiveness - The current effectiveness of the move
+   * @returns Whether this function did anything
+   */
+  applyTypeEffectiveness(effectiveness: NumberHolder): boolean {
+    return false;
+  }
+
+  /**
+   * Modifies the level of AI Pokemon.
+   * @param level - The generated level.
+   * @param levelCap - The current level cap.
+   * @param isTrainer - Whether this is a trainer Pokémon
+   * @param isBoss - Whether this is a non-trainer boss Pokémon
+   * @returns - Whether this function did anything
+   */
+  applyLevelChange(level: NumberHolder, levelCap: number, isTrainer: boolean, isBoss: boolean): boolean {
+    return false;
+  }
+
+  /**
+   * Modifies the number of move slots an AI Pokemon can have.
+   * @param pokemon - The Pokémon that is being considered
+   * @param moveSlots - The amount of move slots
+   * @returns Whether this function did anything
+   */
+  applyMoveSlot(pokemon: Pokemon, moveSlots: NumberHolder): boolean {
+    return false;
+  }
+
+  /**
+   * Modifies the availability of passive abilities.
+   * @param pokemon - The Pokémon to change
+   * @param hasPassive - Whether it should have its passive
+   * @returns Whether this function did anything
+   */
+  applyPassiveAccess(pokemon: Pokemon, hasPassive: BooleanHolder): boolean {
+    return false;
+  }
+
+  /**
+   * Modifies {@linkcode GameMode | globalScene.gameMode}.
+   * @returns Whether this function did anything
+   */
+  applyGameModeModify(): boolean {
+    return false;
+  }
+
+  /**
+   * Modifies the levels moves can be learned at.
+   * @param pokemon - What Pokémon would learn the move
+   * @param moveSource - What source the Pokémon would get the move from
+   * @param moveId - The move in question
+   * @param level - The level threshold for access
+   * @returns Whether this function did anything
+   */
+  applyMoveAccessLevel(pokemon: Pokemon, moveSource: MoveSourceType, moveId: MoveId, level: NumberHolder): boolean {
+    return false;
+  }
+
+  /**
+   * Modifies the weighting of moves when generating AI movesets.
+   * @param pokemon - What Pokémon would learn the move
+   * @param moveSource - What source the Pokémon would get the move from
+   * @param moveId - The move in question.
+   * @param weight - The base weight of the move
+   * @returns Whether this function did anything
+   */
+  applyMoveWeight(pokemon: Pokemon, moveSource: MoveSourceType, moveId: MoveId, weight: NumberHolder): boolean {
+    return false;
+  }
+
+  /**
+   * Modifies the base stats of a Pokemon.
+   * @param pokemon - What Pokémon would learn the move
+   * @param baseStats  What are the stats to flip
+   * @returns Whether this function did anything
+   */
+  // TODO: rename / make into a more generic function
+  applyFlipStat(pokemon: Pokemon, baseStats: number[]) {
+    return false;
+  }
+
+  /**
+   * Modifies whether the automatic party healing after every 10th wave is enabled or not.
+   * @param isEnabled - Whether party healing is enabled or not
+   * @returns Whether this function did anything
+   */
+  applyPartyHeal(isEnabled: BooleanHolder): boolean {
+    return false;
+  }
+
+  /**
+   * Modifies whether the shop is available at the end of each wave.
+   * @param isEnabled - Whether the shop is or is not available after a wave
+   * @returns Whether this function did anything
+   */
+  applyShop(isEnabled: BooleanHolder) {
+    return false;
+  }
+
+  /**
+   * Modifies whether a Pokemon can be added to the party.
+   * @param pokemon - The Pokémon being caught
+   * @param isValid - Whether the Pokémon can be added to the party or not
+   * @returns Whether this function did anything
+   */
+  applyPokemonAddToParty(pokemon: EnemyPokemon, isValid: BooleanHolder): boolean {
+    return false;
+  }
+
+  /**
+   * An apply function for POKEMON_FUSION. Derived classes should alter this.
+   * @param pokemon - The Pokémon being checked
+   * @param isValid - Whether the selected Pokémon is allowed to fuse or not
+   * @returns Whether this function did anything
+   */
+  applyPokemonFusion(pokemon: PlayerPokemon, isValid: BooleanHolder): boolean {
+    return false;
+  }
+
+  /**
+   * Modifies whether a move can be used in battle.
+   * @param moveId - The {@linkcode MoveId} being checked
+   * @param isValid - A {@linkcode BooleanHolder} containing the move's usability status
+   * @returns Whether this function did anything
+   */
+  applyPokemonMove(moveId: MoveId, isValid: BooleanHolder): boolean {
+    return false;
+  }
+
+  /**
+   * Modifies the items available in the shop.
+   * @param shopItem - The item being checked
+   * @param isValid - Whether the item should be added to the shop or not
+   * @returns Whether this function did anything
+   */
+  // TODO: why can the item be `null`?
+  applyShopItem(shopItem: ModifierTypeOption | null, isValid: BooleanHolder): boolean {
+    return false;
+  }
+
+  /**
+   * Modifies the items available as post-wave rewards.
+   * @param reward - The reward being checked
+   * @param isValid - Whether the reward should be added to the reward options or not
+   * @returns Whether this function did anything
+   */
+  // TODO: why can the item be `null`?
+  applyWaveReward(reward: ModifierTypeOption | null, isValid: BooleanHolder): boolean {
+    return false;
+  }
+
+  /**
+   * Modifies whether Pokemon can be revived.
+   * @param isValid - Whether fainting is a permanent status or not
+   * @returns Whether this function did anything
+   */
+  applyPreventRevive(isValid: BooleanHolder): boolean {
+    return false;
+  }
+
+  /**
+   * Modifies a Pokemon's moveset after it has been generated.
+   * @param pokemon - The pokemon whose moveset is being modified
+   * @returns Whether this modification was applied
+   */
+  public applyMovesetModify(pokemon: Pokemon): boolean {
+    return false;
+  }
+
+  /**
+   * Modifies a species' level up moveset.
+   * @param species - The species whose level up moveset is being modified
+   * @param levelMoves - The level up moveset being modified
+   * @returns Whether this modification was applied
+   */
+  public applyLevelUpMoveset(species: PokemonSpeciesForm, levelMoves: LevelMoves): boolean {
+    return false;
+  }
+
+  /**
+   * Modifies the TM compatbility list of a player Pokemon.
+   * @param pokemon - The player Pokemon whose TM compatibility list is being modified
+   * @param tms - A `Set` containing the list of compatible TMs
+   * @returns Whether this modification was applied
+   */
+  public applyPlayerTMCompatibility(pokemon: PlayerPokemon, tms: Set<MoveId>): boolean {
+    return false;
+  }
+
+  /**
+   * Modifies the TM compatibility list of an enemy species.
+   * @param species - The species whose TM compatibility is being modified
+   * @param tmList - The array of compatible TMs
+   * @returns Whether this modification was applied
+   */
+  public applyEnemyTMCompatibility(species: PokemonSpecies, tmList: MoveId[]): boolean {
+    return false;
+  }
+
+  /**
+   * Modifies the egg move pool available to be used in AI moveset generation.
+   * @param speciesId - The {@linkcode SpeciesId | ID of the species} whose egg move pool should be modified
+   * @param movePool - The map of {@linkcode MoveId}s to weights
+   * @returns Whether this modification was applied
+   */
+  public applyAIMoveGenerationEggPool(speciesId: SpeciesId, movePool: Map<MoveId, number>): boolean {
+    return false;
+  }
+
+  /**
+   * Modifies the superceded moves map used by AI moveset generation.
+   * @param supercededMoves - The map of {@linkcode MoveId}s to replacement move IDs
+   * @returns Whether this modification was applied
+   */
+  public applyAIMoveGenerationSupercededMap(supercededMoves: Partial<Record<MoveId, MoveId[]>>): boolean {
+    return false;
+  }
+
+  /**
+   * Modifies the evolutions of a Pokemon.
+   * @param pokemon - The {@linkcode Pokemon} to get evolutions for
+   * @param evos - The array of {@linkcode SpeciesFormEvolution}s for that Pokemon
+   * @returns Whether this modification was applied
+   */
+  public applyModifyEvolutions(pokemon: Pokemon, evos: SpeciesFormEvolution[]): boolean {
+    return false;
+  }
+
+  /**
+   * Modifies a Pokemon's moveset after generation during a Mystery Encounter
+   * @param pokemon - The Pokemon whose moveset is being modified
+   * @returns Whether this modification was applied
+   */
+  public applyMysteryEncounterMovesetModify(pokemon: Pokemon): boolean {
+    return false;
+  }
+
+  /**
+   * Modifies the ability to relearn egg moves via Memory Mushroom for player Pokemon.
+   * @param pokemon - The {@linkcode Pokemon} to set egg move legality for
+   * @param isAvailable - A holder used to set egg move legality
+   * @returns Whether this modification was applied
+   */
+  public applyEggMoveRelearnAvailability(pokemon: Pokemon, isAvailable: ValueHolder<boolean>): boolean {
+    return false;
+  }
+
+  /**
+   * Modifies the innate abilities of a species
+   * @param speciesId - The ID of the species whose abilties are being modified
+   * @param abilityId - A holder for the ability ID
+   * @returns Whether this modification was applied
+   */
+  public applySpeciesAbilityModify(speciesId: SpeciesId, abilityId: ValueHolder<AbilityId>) {
+    return false;
+  }
+
+  /**
+   * Modifies the passive ability of a species
+   * @param speciesId - The ID of the species whose passive ability is being modified
+   * @param abilityId - A holder for the ability ID
+   * @returns Whether this modification was applied
+   */
+  public applyPassiveAbilityModify(speciesId: SpeciesId, abilityId: ValueHolder<AbilityId>) {
+    return false;
+  }
+
+  // biome-ignore-end lint/correctness/noUnusedFunctionParameters: pseudo-abstract methods
+}
+
+/** Implements a mono generation challenge. */
+export class SingleGenerationChallenge extends Challenge {
+  public override get ribbonAwarded(): RibbonFlag {
+    // NOTE: This logic will not work for the eventual mono gen 10 ribbon,
+    // as its flag will not be in sequence with the other mono gen ribbons.
+    return this.value ? ((RibbonData.MONO_GEN_1 << (BigInt(this.value) - 1n)) as RibbonFlag) : 0n;
+  }
+
+  public override get category(): ChallengeCategory {
+    return ChallengeCategory.STARTERS;
+  }
+
+  constructor() {
+    super(Challenges.SINGLE_GENERATION, 9);
+  }
+
+  applyStarterChoice(species: PokemonSpecies, isValid: BooleanHolder): boolean {
+    if (species.generation !== this.value) {
+      isValid.value = false;
+      return true;
+    }
+    return false;
+  }
+
+  applyStarterSelectModify(speciesId: SpeciesId, dexEntry: DexEntry, _starterDataEntry: StarterDataEntry): boolean {
+    // Ralts must be male and Snorunt must be female
+    if (this.value === 4) {
+      if (speciesId === SpeciesId.RALTS) {
+        dexEntry.caughtAttr &= ~DexAttr.FEMALE;
+      }
+      if (speciesId === SpeciesId.SNORUNT) {
+        dexEntry.caughtAttr &= ~DexAttr.MALE;
+      }
+    }
+
+    return true;
+  }
+
+  applyPokemonInBattle(pokemon: Pokemon, valid: BooleanHolder): boolean {
+    const baseGeneration = speciesDataRegistry.getSpecies(pokemon.species.speciesId).generation;
+    const fusionGeneration = pokemon.isFusion()
+      ? speciesDataRegistry.getSpecies(pokemon.fusionSpecies!.speciesId).generation
+      : 0;
+    if (
+      pokemon.isPlayer()
+      && (baseGeneration !== this.value || (pokemon.isFusion() && fusionGeneration !== this.value))
+    ) {
+      valid.value = false;
+      return true;
+    }
+    return false;
+  }
+
+  applyFixedBattle(waveIndex: number, battleConfig: FixedBattleConfig): boolean {
+    let trainerTypes: (TrainerType | TrainerType[])[] = [];
+    const evilTeamWaves: number[] = [
+      ClassicFixedBossWaves.EVIL_GRUNT_1,
+      ClassicFixedBossWaves.EVIL_GRUNT_2,
+      ClassicFixedBossWaves.EVIL_GRUNT_3,
+      ClassicFixedBossWaves.EVIL_ADMIN_1,
+      ClassicFixedBossWaves.EVIL_GRUNT_4,
+      ClassicFixedBossWaves.EVIL_ADMIN_2,
+      ClassicFixedBossWaves.EVIL_BOSS_1,
+      ClassicFixedBossWaves.EVIL_ADMIN_3,
+      ClassicFixedBossWaves.EVIL_BOSS_2,
+    ];
+    const evilTeamGrunts = [
+      [TrainerType.ROCKET_GRUNT],
+      [TrainerType.ROCKET_GRUNT],
+      [TrainerType.MAGMA_GRUNT, TrainerType.AQUA_GRUNT],
+      [TrainerType.GALACTIC_GRUNT],
+      [TrainerType.PLASMA_GRUNT],
+      [TrainerType.FLARE_GRUNT],
+      [TrainerType.AETHER_GRUNT, TrainerType.SKULL_GRUNT],
+      [TrainerType.MACRO_GRUNT],
+      [TrainerType.STAR_GRUNT],
+    ];
+    const evilAdminFight1 = [
+      [TrainerType.PETREL],
+      [TrainerType.PETREL],
+      [
+        [TrainerType.TABITHA, TrainerType.COURTNEY],
+        [TrainerType.MATT, TrainerType.SHELLY],
+      ],
+      [TrainerType.JUPITER, TrainerType.MARS, TrainerType.SATURN],
+      [TrainerType.COLRESS],
+      [TrainerType.BRYONY, TrainerType.ALIANA, TrainerType.CELOSIA, TrainerType.MABLE],
+      [TrainerType.FABA, TrainerType.PLUMERIA],
+      [TrainerType.OLEANA],
+      [TrainerType.GIACOMO, TrainerType.MELA, TrainerType.ATTICUS, TrainerType.ORTEGA, TrainerType.ERI],
+    ];
+    const evilAdminFight2 = [
+      [TrainerType.PROTON],
+      [TrainerType.PROTON],
+      [
+        [TrainerType.TABITHA, TrainerType.COURTNEY],
+        [TrainerType.MATT, TrainerType.SHELLY],
+      ],
+      [TrainerType.JUPITER, TrainerType.MARS, TrainerType.SATURN],
+      [TrainerType.ZINZOLIN],
+      [TrainerType.BRYONY, TrainerType.ALIANA, TrainerType.CELOSIA, TrainerType.MABLE],
+      [TrainerType.FABA, TrainerType.PLUMERIA],
+      [TrainerType.OLEANA],
+      [TrainerType.GIACOMO, TrainerType.MELA, TrainerType.ATTICUS, TrainerType.ORTEGA, TrainerType.ERI],
+    ];
+    const evilAdminFight3 = [
+      [TrainerType.ARCHER, TrainerType.ARIANA],
+      [TrainerType.ARCHER, TrainerType.ARIANA],
+      [
+        [TrainerType.TABITHA, TrainerType.COURTNEY],
+        [TrainerType.MATT, TrainerType.SHELLY],
+      ],
+      [TrainerType.JUPITER, TrainerType.MARS, TrainerType.SATURN],
+      [TrainerType.COLRESS],
+      [TrainerType.XEROSIC],
+      [TrainerType.FABA, TrainerType.PLUMERIA],
+      [TrainerType.OLEANA],
+      [TrainerType.GIACOMO, TrainerType.MELA, TrainerType.ATTICUS, TrainerType.ORTEGA, TrainerType.ERI],
+    ];
+    const evilTeamBosses = [
+      [TrainerType.ROCKET_BOSS_GIOVANNI_1],
+      [TrainerType.ROCKET_BOSS_GIOVANNI_1],
+      [TrainerType.MAXIE, TrainerType.ARCHIE],
+      [TrainerType.CYRUS],
+      [TrainerType.GHETSIS],
+      [TrainerType.LYSANDRE],
+      [TrainerType.LUSAMINE, TrainerType.GUZMA],
+      [TrainerType.ROSE],
+      [TrainerType.PENNY],
+    ];
+    const evilTeamBossRematches = [
+      [TrainerType.ROCKET_BOSS_GIOVANNI_2],
+      [TrainerType.ROCKET_BOSS_GIOVANNI_2],
+      [TrainerType.MAXIE_2, TrainerType.ARCHIE_2],
+      [TrainerType.CYRUS_2],
+      [TrainerType.GHETSIS_2],
+      [TrainerType.LYSANDRE_2],
+      [TrainerType.LUSAMINE_2, TrainerType.GUZMA_2],
+      [TrainerType.ROSE_2],
+      [TrainerType.PENNY_2],
+    ];
+    switch (waveIndex) {
+      case ClassicFixedBossWaves.EVIL_GRUNT_1:
+        trainerTypes = evilTeamGrunts[this.value - 1];
+        battleConfig.setBattleType(BattleType.TRAINER).setGetTrainerFunc(getRandomTrainerFunc(trainerTypes, true));
+        return true;
+      case ClassicFixedBossWaves.EVIL_GRUNT_2:
+      case ClassicFixedBossWaves.EVIL_GRUNT_3:
+      case ClassicFixedBossWaves.EVIL_GRUNT_4:
+        trainerTypes = evilTeamGrunts[this.value - 1];
+        break;
+      case ClassicFixedBossWaves.EVIL_ADMIN_1:
+        trainerTypes = evilAdminFight1[this.value - 1];
+        break;
+      case ClassicFixedBossWaves.EVIL_ADMIN_2:
+        trainerTypes = evilAdminFight2[this.value - 1];
+        break;
+      case ClassicFixedBossWaves.EVIL_ADMIN_3:
+        trainerTypes = evilAdminFight3[this.value - 1];
+        break;
+      case ClassicFixedBossWaves.EVIL_BOSS_1:
+        trainerTypes = evilTeamBosses[this.value - 1];
+        battleConfig
+          .setBattleType(BattleType.TRAINER)
+          .setSeedOffsetWave(ClassicFixedBossWaves.EVIL_GRUNT_1)
+          .setGetTrainerFunc(getRandomTrainerFunc(trainerTypes, true))
+          .setCustomModifierRewards({
+            guaranteedModifierTiers: [
+              ModifierTier.ROGUE,
+              ModifierTier.ROGUE,
+              ModifierTier.ULTRA,
+              ModifierTier.ULTRA,
+              ModifierTier.ULTRA,
+            ],
+            allowLuckUpgrades: false,
+          });
+        return true;
+      case ClassicFixedBossWaves.EVIL_BOSS_2:
+        trainerTypes = evilTeamBossRematches[this.value - 1];
+        battleConfig
+          .setBattleType(BattleType.TRAINER)
+          .setSeedOffsetWave(ClassicFixedBossWaves.EVIL_GRUNT_1)
+          .setGetTrainerFunc(getRandomTrainerFunc(trainerTypes, true))
+          .setCustomModifierRewards({
+            guaranteedModifierTiers: [
+              ModifierTier.ROGUE,
+              ModifierTier.ROGUE,
+              ModifierTier.ULTRA,
+              ModifierTier.ULTRA,
+              ModifierTier.ULTRA,
+              ModifierTier.ULTRA,
+            ],
+            allowLuckUpgrades: false,
+          });
+        return true;
+      case ClassicFixedBossWaves.ELITE_FOUR_1:
+        trainerTypes = [
+          TrainerType.LORELEI,
+          TrainerType.WILL,
+          TrainerType.SIDNEY,
+          TrainerType.AARON,
+          TrainerType.SHAUNTAL,
+          TrainerType.MALVA,
+          randSeedItem([TrainerType.HALA, TrainerType.MOLAYNE]),
+          randSeedItem([TrainerType.MARNIE_ELITE, TrainerType.BEDE_ELITE]),
+          TrainerType.RIKA,
+        ];
+        break;
+      case ClassicFixedBossWaves.ELITE_FOUR_2:
+        trainerTypes = [
+          TrainerType.BRUNO,
+          TrainerType.KOGA,
+          TrainerType.PHOEBE,
+          TrainerType.BERTHA,
+          TrainerType.MARSHAL,
+          TrainerType.SIEBOLD,
+          TrainerType.OLIVIA,
+          TrainerType.NESSA_ELITE,
+          TrainerType.POPPY,
+        ];
+        break;
+      case ClassicFixedBossWaves.ELITE_FOUR_3:
+        trainerTypes = [
+          TrainerType.AGATHA,
+          TrainerType.BRUNO,
+          TrainerType.GLACIA,
+          TrainerType.FLINT,
+          TrainerType.GRIMSLEY,
+          TrainerType.WIKSTROM,
+          TrainerType.ACEROLA,
+          randSeedItem([TrainerType.BEA_ELITE, TrainerType.ALLISTER_ELITE]),
+          TrainerType.LARRY_ELITE,
+        ];
+        break;
+      case ClassicFixedBossWaves.ELITE_FOUR_4:
+        trainerTypes = [
+          TrainerType.LANCE,
+          TrainerType.KAREN,
+          TrainerType.DRAKE,
+          TrainerType.LUCIAN,
+          TrainerType.CAITLIN,
+          TrainerType.DRASNA,
+          TrainerType.KAHILI,
+          TrainerType.RAIHAN_ELITE,
+          TrainerType.HASSEL,
+        ];
+        break;
+      case ClassicFixedBossWaves.CHAMPION:
+        trainerTypes = [
+          TrainerType.BLUE,
+          randSeedItem([TrainerType.RED, TrainerType.LANCE_CHAMPION]),
+          randSeedItem([TrainerType.STEVEN, TrainerType.WALLACE]),
+          TrainerType.CYNTHIA,
+          randSeedItem([TrainerType.ALDER, TrainerType.IRIS]),
+          TrainerType.DIANTHA,
+          randSeedItem([TrainerType.KUKUI, TrainerType.HAU]),
+          randSeedItem([TrainerType.LEON, TrainerType.MUSTARD]),
+          randSeedItem([TrainerType.GEETA, TrainerType.NEMONA]),
+        ];
+        break;
+    }
+    if (trainerTypes.length === 0) {
+      return false;
+    }
+    if (evilTeamWaves.includes(waveIndex)) {
+      battleConfig
+        .setBattleType(BattleType.TRAINER)
+        .setSeedOffsetWave(ClassicFixedBossWaves.EVIL_GRUNT_1)
+        .setGetTrainerFunc(getRandomTrainerFunc(trainerTypes, true));
+      return true;
+    }
+    if (waveIndex >= ClassicFixedBossWaves.ELITE_FOUR_1 && waveIndex <= ClassicFixedBossWaves.CHAMPION) {
+      const ttypes = trainerTypes as TrainerType[];
+      battleConfig
+        .setBattleType(BattleType.TRAINER)
+        .setGetTrainerFunc(() => new Trainer(ttypes[this.value - 1], TrainerVariant.DEFAULT));
+      return true;
+    }
+    return false;
+  }
+
+  public override get difficulty(): number {
+    return this.value > 0 ? 1 : 0;
+  }
+
+  getValue(overrideValue: number = this.value): string {
+    if (overrideValue === 0) {
+      return i18next.t("settings:off");
+    }
+    return i18next.t(`starterSelectUiHandler:gen${overrideValue}`);
+  }
+
+  getDescription(overrideValue: number = this.value): string {
+    if (overrideValue === 0) {
+      return i18next.t("challenges:singleGeneration.descDefault");
+    }
+    return i18next.t("challenges:singleGeneration.desc", {
+      gen: i18next.t(`challenges:singleGeneration.gen.${overrideValue}`),
+    });
+  }
+}
+
+interface MonotypeOverride {
+  /** The species to override */
+  species: SpeciesId;
+  /** The type to count as */
+  type: RegularPokemonType;
+  /** If part of a fusion, should we check the fused species instead of the base species? */
+  fusion: boolean;
+}
+
+/** Implements a mono type challenge. */
+export class SingleTypeChallenge extends Challenge {
+  public override get ribbonAwarded(): RibbonFlag {
+    // `this.value` represents the 1-based index of pokemon type
+    // `RibbonData.MONO_NORMAL` starts the flag position for the types,
+    // and we shift it by 1 for the specific type.
+    return this.value ? ((RibbonData.MONO_NORMAL << (BigInt(this.value) - 1n)) as RibbonFlag) : 0n;
+  }
+
+  public override get category(): ChallengeCategory {
+    return ChallengeCategory.STARTERS;
+  }
+
+  // TODO: Find a solution for all Pokemon with this ssui issue, including Basculin and Burmy
+  private static readonly TYPE_OVERRIDES: MonotypeOverride[] = [
+    { species: SpeciesId.CASTFORM, type: PokemonType.NORMAL, fusion: false },
+  ];
+
+  constructor() {
+    super(Challenges.SINGLE_TYPE, 18);
+  }
+
+  override applyStarterChoice(species: PokemonSpecies, isValid: BooleanHolder, dexAttr: DexAttrProps): boolean {
+    const speciesForm = speciesDataRegistry.getPokemonSpeciesForm(species.speciesId, dexAttr.formIndex);
+    const types = [speciesForm.type1, speciesForm.type2];
+    if (!types.includes(this.value - 1)) {
+      isValid.value = false;
+      return true;
+    }
+    return false;
+  }
+
+  applyStarterSelectModify(speciesId: SpeciesId, dexEntry: DexEntry, _starterDataEntry: StarterDataEntry): boolean {
+    const type = this.value - 1;
+
+    if (speciesId === SpeciesId.RALTS && type === PokemonType.FIGHTING) {
+      dexEntry.caughtAttr &= ~DexAttr.FEMALE;
+    } else if (speciesId === SpeciesId.SNORUNT && type === PokemonType.GHOST) {
+      dexEntry.caughtAttr &= ~DexAttr.MALE;
+    } else if (speciesId === SpeciesId.BURMY) {
+      if (type === PokemonType.FLYING) {
+        dexEntry.caughtAttr &= ~DexAttr.FEMALE;
+      } else if ([PokemonType.GRASS, PokemonType.GROUND, PokemonType.STEEL].includes(type)) {
+        dexEntry.caughtAttr &= ~DexAttr.MALE;
+      }
+    }
+
+    return true;
+  }
+
+  applyPokemonInBattle(pokemon: Pokemon, valid: BooleanHolder): boolean {
+    if (
+      pokemon.isPlayer()
+      && !pokemon.isOfType(this.value - 1, { includeTeraType: false, bypassSummonData: true, ignoreThirdType: true })
+      && !SingleTypeChallenge.TYPE_OVERRIDES.some(
+        o =>
+          o.type === this.value - 1
+          && (pokemon.isFusion() && o.fusion ? pokemon.fusionSpecies! : pokemon.species).speciesId === o.species, // TODO: is the bang on fusionSpecies correct?
+      )
+    ) {
+      valid.value = false;
+      return true;
+    }
+    return false;
+  }
+
+  public override get difficulty(): number {
+    return this.value > 0 ? 1 : 0;
+  }
+
+  getValue(overrideValue: number = this.value): string {
+    return PokemonType[overrideValue - 1].toLowerCase();
+  }
+
+  getDescription(overrideValue: number = this.value): string {
+    const type = i18next.t(getPokemonTypeLocaleKey(overrideValue - 1));
+    const typeColor = `[color=${TypeColor[PokemonType[overrideValue - 1]]}][shadow=${TypeShadow[PokemonType[this.value - 1]]}]${type}[/shadow][/color]`;
+    const defaultDesc = i18next.t("challenges:singleType.descDefault");
+    const typeDesc = i18next.t("challenges:singleType.desc", {
+      type: typeColor,
+    });
+    return this.value === 0 ? defaultDesc : typeDesc;
+  }
+}
+
+/** Implements a fresh start challenge. */
+export class FreshStartChallenge extends Challenge {
+  public override get ribbonAwarded(): RibbonFlag {
+    return this.value ? RibbonData.FRESH_START : 0n;
+  }
+
+  public override get category(): ChallengeCategory {
+    return ChallengeCategory.STARTERS;
+  }
+
+  constructor() {
+    super(Challenges.FRESH_START, 2);
+  }
+
+  applyStarterChoice(species: PokemonSpecies, isValid: BooleanHolder): boolean {
+    if (this.value === 1 && !speciesDataRegistry.getDefaultStartersAndEvolutions().includes(species.speciesId)) {
+      isValid.value = false;
+      return true;
+    }
+    return false;
+  }
+
+  applyStarterCost(speciesId: SpeciesId, cost: NumberHolder): boolean {
+    // Add the value reduction to the cost, so it cancels out in the cost calculation;
+    // doing it this ways allows other challenges (i.e. ability randomizer) to also alter the cost.
+    cost.value += globalScene.gameData.starterData[speciesId].valueReduction;
+    return true;
+  }
+
+  applyStarterSelectModify(speciesId: SpeciesId, dexEntry: DexEntry, starterDataEntry: StarterDataEntry): boolean {
+    // Remove all egg moves
+    starterDataEntry.eggMoves = 0;
+
+    // Remove hidden and passive ability
+    const defaultAbilities = AbilityAttr.ABILITY_1 | AbilityAttr.ABILITY_2;
+    starterDataEntry.abilityAttr &= defaultAbilities;
+    starterDataEntry.passiveAttr = 0;
+
+    // Remove cost reduction
+    starterDataEntry.valueReduction = 0;
+
+    // Remove natures except for the default ones
+    const neutralNaturesAttr =
+      (1 << (Nature.HARDY + 1))
+      | (1 << (Nature.DOCILE + 1))
+      | (1 << (Nature.SERIOUS + 1))
+      | (1 << (Nature.BASHFUL + 1))
+      | (1 << (Nature.QUIRKY + 1));
+    dexEntry.natureAttr &= neutralNaturesAttr;
+
+    // Cap all ivs at 15
+    for (let i = 0; i < 6; i++) {
+      dexEntry.ivs[i] = Math.min(dexEntry.ivs[i], 15);
+    }
+
+    // Remove unlocked forms for specific species
+    if (
+      [SpeciesId.PIKACHU, SpeciesId.EEVEE, SpeciesId.PICHU, SpeciesId.ROTOM, SpeciesId.MELOETTA].includes(speciesId)
+    ) {
+      const formMask = (DexAttr.DEFAULT_FORM << 1n) - 1n; // These mons are set to form 0 because they're meant to be unlocks or mid-run form changes
+      dexEntry.caughtAttr &= formMask;
+    }
+
+    return true;
+  }
+
+  applyStarterModify(pokemon: Pokemon): boolean {
+    pokemon.abilityIndex %= 2; // Always base ability, if you set it to hidden it wraps to first ability
+    pokemon.passive = false; // Passive isn't unlocked
+    let validMoves = pokemon.species
+      .getLevelMoves()
+      .filter(m => isBetween(m[0], 1, 5))
+      .map(lm => lm[1]);
+    // Filter egg moves out of the moveset
+    pokemon.moveset = pokemon.moveset.filter(pm => validMoves.includes(pm.moveId));
+    if (pokemon.moveset.length < 4) {
+      // If there's empty slots fill with remaining valid moves
+      const existingMoveIds = pokemon.moveset.map(pm => pm.moveId);
+      validMoves = validMoves.filter(m => !existingMoveIds.includes(m));
+      pokemon.moveset = pokemon.moveset.concat(validMoves.map(m => new PokemonMove(m))).slice(0, 4);
+    }
+    pokemon.luck = 0; // No luck, even if shiny
+    if (
+      pokemon.formIndex > 0
+      && [SpeciesId.PIKACHU, SpeciesId.EEVEE, SpeciesId.PICHU, SpeciesId.ROTOM, SpeciesId.MELOETTA].includes(
+        pokemon.species.speciesId,
+      )
+    ) {
+      pokemon.formIndex = 0; // These mons are set to form 0 because they're meant to be unlocks or mid-run form changes
+    }
+    // Cap all ivs at 15
+    for (let i = 0; i < 6; i++) {
+      pokemon.ivs[i] = Math.min(pokemon.ivs[i], 15);
+    }
+    pokemon.teraType = pokemon.species.type1; // Always primary tera type
+    return true;
+  }
+
+  public override applyEggMoveRelearnAvailability(_pokemon: Pokemon, isAvailable: ValueHolder<boolean>): boolean {
+    isAvailable.value = false;
+
+    return true;
+  }
+
+  public override get difficulty(): number {
+    return 0;
+  }
+}
+
+/** Implements an inverse battle challenge. */
+export class InverseBattleChallenge extends Challenge {
+  public override get ribbonAwarded(): RibbonFlag {
+    return this.value ? RibbonData.INVERSE : 0n;
+  }
+
+  public override get category(): ChallengeCategory {
+    return ChallengeCategory.GIMMICK;
+  }
+
+  constructor() {
+    super(Challenges.INVERSE_BATTLE, 1);
+  }
+
+  public override get difficulty(): number {
+    return 0;
+  }
+
+  applyTypeEffectiveness(effectiveness: NumberHolder): boolean {
+    if (effectiveness.value < 1) {
+      effectiveness.value = 2;
+      return true;
+    }
+    if (effectiveness.value > 1) {
+      effectiveness.value = 0.5;
+      return true;
+    }
+
+    return false;
+  }
+}
+
+/** Implements a flip stat challenge. */
+export class FlipStatChallenge extends Challenge {
+  public override get ribbonAwarded(): RibbonFlag {
+    return this.value ? RibbonData.FLIP_STATS : 0n;
+  }
+
+  public override get category(): ChallengeCategory {
+    return ChallengeCategory.GIMMICK;
+  }
+
+  constructor() {
+    super(Challenges.FLIP_STAT, 1);
+  }
+
+  override applyFlipStat(_pokemon: Pokemon, baseStats: number[]) {
+    const origStats = deepCopy(baseStats);
+    baseStats[0] = origStats[5];
+    baseStats[1] = origStats[4];
+    baseStats[2] = origStats[3];
+    baseStats[3] = origStats[2];
+    baseStats[4] = origStats[1];
+    baseStats[5] = origStats[0];
+    return true;
+  }
+}
+
+/** Lowers the amount of starter points available. */
+export class LowerStarterMaxCostChallenge extends Challenge {
+  public override get category(): ChallengeCategory {
+    return ChallengeCategory.UNUSED;
+  }
+
+  constructor() {
+    super(Challenges.LOWER_MAX_STARTER_COST, 9);
+  }
+
+  getValue(overrideValue: number = this.value): string {
+    return (DEFAULT_PARTY_MAX_COST - overrideValue).toString();
+  }
+
+  applyStarterChoice(species: PokemonSpecies, isValid: BooleanHolder): boolean {
+    if (speciesDataRegistry.getStarterCost(species.speciesId) > DEFAULT_PARTY_MAX_COST - this.value) {
+      isValid.value = false;
+      return true;
+    }
+    return false;
+  }
+}
+
+/** Lowers the maximum cost of starters available. */
+export class LowerStarterPointsChallenge extends Challenge {
+  public override get category(): ChallengeCategory {
+    return ChallengeCategory.UNUSED;
+  }
+
+  constructor() {
+    super(Challenges.LOWER_STARTER_POINTS, 9);
+  }
+
+  getValue(overrideValue: number = this.value): string {
+    return (DEFAULT_PARTY_MAX_COST - overrideValue).toString();
+  }
+
+  applyStarterPoints(points: NumberHolder): boolean {
+    points.value -= this.value;
+    return true;
+  }
+}
+
+/** Implements a No Support challenge */
+export class LimitedSupportChallenge extends Challenge {
+  public override get ribbonAwarded(): RibbonFlag {
+    switch (this.value) {
+      case 1:
+        return RibbonData.NO_HEAL as RibbonFlag;
+      case 2:
+        return RibbonData.NO_SHOP as RibbonFlag;
+      case 3:
+        return (RibbonData.NO_HEAL | RibbonData.NO_SHOP | RibbonData.NO_SUPPORT) as RibbonFlag;
+      default:
+        return 0n as RibbonFlag;
+    }
+  }
+
+  public override get category(): ChallengeCategory {
+    return ChallengeCategory.DIFFICULTY;
+  }
+
+  constructor() {
+    super(Challenges.LIMITED_SUPPORT, 3);
+  }
+
+  override applyPartyHeal(isEnabled: BooleanHolder): boolean {
+    if (isEnabled.value) {
+      isEnabled.value = this.value === 2;
+      return true;
+    }
+    return false;
+  }
+
+  override applyShop(isEnabled: BooleanHolder): boolean {
+    if (isEnabled.value) {
+      isEnabled.value = this.value === 1;
+      return true;
+    }
+    return false;
+  }
+}
+
+/** Implements a Limited Catch challenge */
+export class LimitedCatchChallenge extends Challenge {
+  public override get ribbonAwarded(): RibbonFlag {
+    return this.value ? RibbonData.LIMITED_CATCH : 0n;
+  }
+
+  public override get category(): ChallengeCategory {
+    return ChallengeCategory.DIFFICULTY;
+  }
+
+  constructor() {
+    super(Challenges.LIMITED_CATCH, 1);
+  }
+
+  override applyPokemonAddToParty(pokemon: EnemyPokemon, isValid: BooleanHolder): boolean {
+    if (isValid.value) {
+      const isTeleporter =
+        globalScene.currentBattle.mysteryEncounter?.encounterType === MysteryEncounterType.TELEPORTING_HIJINKS
+        && globalScene.currentBattle.mysteryEncounter.selectedOption
+          !== globalScene.currentBattle.mysteryEncounter.options[2]; // don't allow catch when not choosing biome change option
+      const isFirstWave = pokemon.metWave % 10 === 1;
+      isValid.value = isTeleporter || isFirstWave;
+      return true;
+    }
+    return false;
+  }
+}
+
+/** Implements a Permanent Faint challenge */
+export class HardcoreChallenge extends Challenge {
+  public override get ribbonAwarded(): RibbonFlag {
+    return this.value ? RibbonData.HARDCORE : 0n;
+  }
+
+  public override get category(): ChallengeCategory {
+    return ChallengeCategory.DIFFICULTY;
+  }
+
+  constructor() {
+    super(Challenges.HARDCORE, 1);
+  }
+
+  override applyPokemonFusion(pokemon: PlayerPokemon, isValid: BooleanHolder): boolean {
+    if (!isValid.value) {
+      isValid.value = pokemon.isFainted();
+      return true;
+    }
+    return false;
+  }
+
+  override applyShopItem(shopItem: ModifierTypeOption | null, isValid: BooleanHolder): boolean {
+    isValid.value = shopItem?.type.group !== "revive";
+    return true;
+  }
+
+  override applyWaveReward(reward: ModifierTypeOption | null, isValid: BooleanHolder): boolean {
+    return this.applyShopItem(reward, isValid);
+  }
+
+  override applyPokemonMove(moveId: MoveId, isValid: BooleanHolder) {
+    if (isValid.value) {
+      isValid.value = moveId !== MoveId.REVIVAL_BLESSING;
+      return true;
+    }
+    return false;
+  }
+
+  override applyPreventRevive(isValid: BooleanHolder): boolean {
+    if (!isValid.value) {
+      isValid.value = true;
+      return true;
+    }
+    return false;
+  }
+}
+
+export class PassivesChallenge extends Challenge {
+  public override get ribbonAwarded(): RibbonFlag {
+    return this.value ? RibbonData.PASSIVE_CHALLENGE : 0n;
+  }
+
+  public override get category(): ChallengeCategory {
+    return ChallengeCategory.GIMMICK;
+  }
+
+  constructor() {
+    super(Challenges.PASSIVES, 2);
+  }
+
+  override applyPassiveAccess(pokemon: Pokemon, hasPassive: BooleanHolder): boolean {
+    const isTrainer = pokemon.hasTrainer() && pokemon.isEnemy();
+    const isFinalBoss = pokemon.isBoss() && globalScene.gameMode.isWaveFinal(globalScene.currentBattle?.waveIndex);
+    if (!isTrainer && this.value === 1 && !isFinalBoss) {
+      return false;
+    }
+    hasPassive.value = true;
+    return true;
+  }
+}
+
+export class MovesetRandomizerChallenge extends Challenge {
+  // Challenge values
+  // 1: Randomize movesets, no compensation for move-based evos
+  // 2: Remove move requirement from move evos
+  constructor() {
+    super(Challenges.MOVESET_RANDOMIZER, 2);
+  }
+
+  public override get category(): ChallengeCategory {
+    return ChallengeCategory.RANDOMIZER;
+  }
+
+  private static _validMoveIds: MoveId[];
+  private get validMoveIds(): MoveId[] {
+    // it's necessary to do it this way due to the static variable
+    // being initialized before the `allMoves` array is
+    if (!MovesetRandomizerChallenge._validMoveIds) {
+      const disallowedMoves = [MoveId.NONE, MoveId.SPLASH, MoveId.HOLD_HANDS, MoveId.STRUGGLE];
+      MovesetRandomizerChallenge._validMoveIds = getEnumValues(MoveId) //
+        .filter(m => !disallowedMoves.includes(m) && !allMoves[m].isUnimplemented);
+    }
+    return [...MovesetRandomizerChallenge._validMoveIds];
+  }
+
+  private static readonly _globalTmList: MoveId[] = Object.keys(tmPoolTiers).map(m => Number(m));
+  private get globalTmList(): MoveId[] {
+    // cloned so that the original list doesn't get mutated by `randSeedShuffle`
+    return [...MovesetRandomizerChallenge._globalTmList];
+  }
+
+  public override applyStarterSelectModify(
+    _speciesId: SpeciesId,
+    _dexEntry: DexEntry,
+    starterDataEntry: StarterDataEntry,
+  ): boolean {
+    // Prevent Pokemon from being able to relearn egg moves via the Memory Mushroom item
+    starterDataEntry.eggMoves = 0;
+
+    return true;
+  }
+
+  public override applyStarterModify(pokemon: Pokemon): boolean {
+    const getFallbackStabMove = (pokemonType: PokemonType): MoveId => {
+      switch (pokemonType) {
+        case PokemonType.NORMAL:
+          return MoveId.POUND;
+        case PokemonType.FIGHTING:
+          return MoveId.ROCK_SMASH;
+        case PokemonType.FLYING:
+          return MoveId.PECK;
+        case PokemonType.POISON:
+          return MoveId.ACID;
+        case PokemonType.GROUND:
+          return MoveId.MUD_SLAP;
+        case PokemonType.ROCK:
+          return MoveId.ROCK_THROW;
+        case PokemonType.BUG:
+          return MoveId.POUNCE;
+        case PokemonType.GHOST:
+          return MoveId.LICK;
+        case PokemonType.STEEL:
+          return MoveId.METAL_CLAW;
+        case PokemonType.FIRE:
+          return MoveId.EMBER;
+        case PokemonType.WATER:
+          return MoveId.WATER_GUN;
+        case PokemonType.GRASS:
+          return MoveId.LEAFAGE;
+        case PokemonType.ELECTRIC:
+          return MoveId.THUNDER_SHOCK;
+        case PokemonType.PSYCHIC:
+          return MoveId.CONFUSION;
+        case PokemonType.ICE:
+          return MoveId.POWDER_SNOW;
+        case PokemonType.DRAGON:
+          return MoveId.TWISTER;
+        case PokemonType.DARK:
+          return MoveId.PURSUIT;
+        case PokemonType.FAIRY:
+          return MoveId.FAIRY_WIND;
+        default:
+          return MoveId.TACKLE;
+      }
+    };
+
+    const levelMoves = pokemon
+      .getLevelMoves({ startingLevel: 1, learnSituation: LearnMoveSituation.LEVEL_UP })
+      .slice(0, 3)
+      .map(lm => lm[1]);
+    pokemon.moveset = [];
+    for (const moveId of levelMoves) {
+      pokemon.moveset.push(new PokemonMove(moveId));
+    }
+
+    if (!pokemon.moveset.some(pm => pm.getMove().is("AttackMove"))) {
+      const fallbackMove = new PokemonMove(getFallbackStabMove(pokemon.species.type1));
+      if (pokemon.moveset.length < 4) {
+        pokemon.moveset.push(fallbackMove);
+      } else {
+        pokemon.moveset[0] = fallbackMove;
+      }
+    }
+
+    return true;
+  }
+
+  public override applyLevelUpMoveset(species: PokemonSpeciesForm, levelMoves: LevelMoves): boolean {
+    // Randomization is hidden during starter select and pokedex
+    // so the player can't "game the system"
+    if (globalScene.ui.mode === UiMode.STARTER_SELECT) {
+      levelMoves.splice(0);
+      return false;
+    }
+    const pokedexUiModes = [UiMode.POKEDEX, UiMode.POKEDEX_PAGE, UiMode.POKEDEX_SCAN];
+    const eggHatchUiModes = [UiMode.EGG_HATCH_SCENE, UiMode.EGG_HATCH_SUMMARY];
+    if ([...pokedexUiModes, ...eggHatchUiModes].includes(globalScene.ui.mode)) {
+      return false;
+    }
+
+    const seedOffset = 2000 * species.getRootSpeciesId(true);
+
+    const originalLevelMoves = [...levelMoves];
+    levelMoves.splice(0);
+
+    for (const [level, moveId] of originalLevelMoves) {
+      // Smeargle's level up moveset consists of multiple copies of Sketch,
+      // which would otherwise all get randomized to the same move without the extra offset
+      const smeargleOffset = species.speciesId === SpeciesId.SMEARGLE ? level : 0;
+      globalScene.executeWithSeedOffset(
+        () => levelMoves.push([level, randSeedItem(this.validMoveIds)]),
+        seedOffset + moveId + smeargleOffset,
+      );
+    }
+
+    return true;
+  }
+
+  public override applyMovesetModify(pokemon: Pokemon): boolean {
+    if (
+      globalScene.currentBattle?.waveIndex === 200
+      && pokemon.isEnemy()
+      && pokemon.species.speciesId === SpeciesId.ETERNATUS
+    ) {
+      pokemon.moveset = new Array(4).fill(new PokemonMove(MoveId.METRONOME));
+    }
+
+    return true;
+  }
+
+  public override applyPlayerTMCompatibility(pokemon: PlayerPokemon, tms: Set<MoveId>): boolean {
+    const numTms = tms.size;
+    tms.clear();
+
+    const seedOffset = 500 * pokemon.species.speciesId;
+    globalScene.executeWithSeedOffset(() => {
+      const shuffledTms = randSeedShuffle(this.globalTmList);
+      for (let i = 0; i < numTms; i++) {
+        tms.add(shuffledTms[i]);
+      }
+    }, seedOffset);
+
+    return true;
+  }
+
+  public override applyEnemyTMCompatibility(species: PokemonSpecies, tmList: MoveId[]): boolean {
+    const numTms = tmList.length;
+    tmList.splice(0);
+
+    const seedOffset = 500 * species.speciesId;
+    globalScene.executeWithSeedOffset(() => {
+      const shuffledTms = randSeedShuffle(this.globalTmList);
+      for (let i = 0; i < numTms; i++) {
+        tmList.push(shuffledTms[i]);
+      }
+    }, seedOffset);
+
+    return true;
+  }
+
+  public override applyAIMoveGenerationEggPool(_speciesId: SpeciesId, movePool: Map<MoveId, number>): boolean {
+    movePool.clear();
+
+    return false;
+  }
+
+  public override applyAIMoveGenerationSupercededMap(supercededMoves: Partial<Record<MoveId, MoveId[]>>): boolean {
+    for (const key of Object.keys(supercededMoves)) {
+      supercededMoves[key] = [];
+    }
+    return true;
+  }
+
+  public override applyModifyEvolutions(pokemon: Pokemon, evos: SpeciesFormEvolution[]): boolean {
+    if (this.value <= 1) {
+      return false;
+    }
+
+    if (pokemon.species.speciesId === SpeciesId.TYROGUE) {
+      if (pokemon.moveset.some(pm => [MoveId.LOW_SWEEP, MoveId.MACH_PUNCH, MoveId.RAPID_SPIN].includes(pm.moveId))) {
+        return false;
+      }
+
+      let tyrogueEvo!: SpeciesId;
+      globalScene.executeWithSeedOffset(
+        () => (tyrogueEvo = randSeedItem([SpeciesId.HITMONCHAN, SpeciesId.HITMONLEE, SpeciesId.HITMONTOP])),
+        pokemon.id,
+      );
+
+      for (const evo of evos) {
+        if (evo.speciesId === tyrogueEvo) {
+          evo.condition = null;
+        }
+      }
+
+      return true;
+    }
+
+    if (!evos.some(e => e.condition?.data.some(c => c.key === EvoCondKey.MOVE))) {
+      return false;
+    }
+
+    let modified = false;
+
+    for (const evo of evos) {
+      if (!evo.condition?.data.some(c => c.key === EvoCondKey.MOVE)) {
+        continue;
+      }
+      if (evo.level === 1) {
+        evo.level = evo.evoLevelThreshold?.[0] ?? 50;
+      }
+      evo.condition.data = evo.condition.data.filter(c => c.key !== EvoCondKey.MOVE);
+      if (evo.condition.data.length === 0) {
+        evo.condition = null;
+      }
+      modified = true;
+    }
+
+    return modified;
+  }
+
+  public override applyMysteryEncounterMovesetModify(pokemon: Pokemon): boolean {
+    const encounters: readonly MysteryEncounterType[] = [
+      MysteryEncounterType.ABSOLUTE_AVARICE,
+      MysteryEncounterType.CLOWNING_AROUND,
+      MysteryEncounterType.MYSTERIOUS_CHEST,
+      MysteryEncounterType.THE_EXPERT_POKEMON_BREEDER,
+      MysteryEncounterType.THE_STRONG_STUFF,
+      MysteryEncounterType.THE_WINSTRATE_CHALLENGE,
+      MysteryEncounterType.TRASH_TO_TREASURE,
+    ];
+
+    const encounterType = globalScene.currentBattle.mysteryEncounter?.encounterType;
+    if (encounters.includes(encounterType!)) {
+      globalScene.executeWithSeedOffset(() => {
+        pokemon.moveset = [];
+        const shuffledMoves = randSeedShuffle(this.validMoveIds);
+        for (let i = 0; i < 4; i++) {
+          pokemon.moveset.push(new PokemonMove(shuffledMoves[i]));
+        }
+        pokemon.summonData.moveset = pokemon.moveset;
+      }, pokemon.id);
+
+      return true;
+    }
+
+    return false;
+  }
+
+  public override applyEggMoveRelearnAvailability(_pokemon: Pokemon, isAvailable: ValueHolder<boolean>): boolean {
+    isAvailable.value = false;
+
+    return true;
+  }
+}
+
+export class AbilityRandomizerChallenge extends Challenge {
+  // Challenge values:
+  // 1 - Randomize abilities
+  // 2 - Randomize abilities and passives
+  // 3 - Randomize abilities and passives, except for innate form-change abilities
+  constructor() {
+    super(Challenges.ABILITY_RANDOMIZER, 3);
+  }
+
+  public override get category(): ChallengeCategory {
+    return ChallengeCategory.RANDOMIZER;
+  }
+
+  private static _validAbilityIds: AbilityId[];
+
+  private get validAbilityIds(): AbilityId[] {
+    // it's necessary to do it this way due to the static variable
+    // being initialized before the `allAbilities` array is
+    if (!AbilityRandomizerChallenge._validAbilityIds) {
+      const formChangeAbilities = [
+        AbilityId.DISGUISE, // can be removed if/when it gets changed to work on any Pokemon
+        AbilityId.FORECAST,
+        AbilityId.GULP_MISSILE,
+        AbilityId.HUNGER_SWITCH,
+        AbilityId.ICE_FACE, // can be removed if/when it gets changed to work on any Pokemon
+        AbilityId.MULTITYPE,
+        AbilityId.POWER_CONSTRUCT,
+        AbilityId.RKS_SYSTEM,
+        AbilityId.SCHOOLING,
+        AbilityId.SHIELDS_DOWN,
+        AbilityId.STANCE_CHANGE,
+        AbilityId.TERA_SHIFT,
+        AbilityId.ZEN_MODE,
+        AbilityId.ZERO_TO_HERO,
+      ];
+      const negativeAbilities = [
+        AbilityId.DEFEATIST,
+        AbilityId.KLUTZ,
+        AbilityId.NORMALIZE,
+        AbilityId.SLOW_START,
+        AbilityId.STALL,
+        AbilityId.TRUANT,
+        AbilityId.WIMP_OUT, // Emergency Exit by itself is okay, Wimp Out is removed to not double up
+      ];
+      const disallowedAbilities = [AbilityId.NONE, AbilityId.COMMANDER, ...formChangeAbilities, ...negativeAbilities];
+      AbilityRandomizerChallenge._validAbilityIds = getEnumValues(AbilityId) //
+        .filter(v => !disallowedAbilities.includes(v) && !allAbilities[v].unimplemented);
+    }
+    return AbilityRandomizerChallenge._validAbilityIds;
+  }
+
+  public override applySpeciesAbilityModify(speciesId: SpeciesId, abilityId: ValueHolder<AbilityId>): boolean {
+    // Randomization is hidden during starter select and pokedex
+    // so the player can't "game the system"
+    const pokedexUiModes = [UiMode.POKEDEX, UiMode.POKEDEX_PAGE, UiMode.POKEDEX_SCAN];
+    const eggHatchUiModes = [UiMode.EGG_HATCH_SCENE, UiMode.EGG_HATCH_SUMMARY];
+    if (
+      [...pokedexUiModes, ...eggHatchUiModes].includes(globalScene.ui.mode)
+      || globalScene.phaseManager.getCurrentPhase().is("SelectStarterPhase")
+    ) {
+      return false;
+    }
+
+    if (
+      this.value > 2
+      && [
+        AbilityId.BATTLE_BOND,
+        AbilityId.DISGUISE,
+        AbilityId.ICE_FACE,
+        AbilityId.POWER_CONSTRUCT,
+        AbilityId.SCHOOLING,
+        AbilityId.SHIELDS_DOWN,
+        AbilityId.TERAFORM_ZERO,
+        AbilityId.TERA_SHELL,
+        AbilityId.TERA_SHIFT,
+        AbilityId.ZERO_TO_HERO,
+      ].includes(abilityId.value)
+    ) {
+      return false;
+    }
+
+    const seedOffset = 500 * speciesId + abilityId.value;
+
+    globalScene.executeWithSeedOffset(() => {
+      abilityId.value = randSeedItem(this.validAbilityIds);
+    }, seedOffset);
+
+    return true;
+  }
+
+  public override applyPassiveAbilityModify(speciesId: SpeciesId, abilityId: ValueHolder<AbilityId>): boolean {
+    if (this.value < 2) {
+      return false;
+    }
+    // Randomization is hidden during starter select and pokedex
+    // so the player can't "game the system"
+    const pokedexUiModes = [UiMode.POKEDEX, UiMode.POKEDEX_PAGE, UiMode.POKEDEX_SCAN];
+    const eggHatchUiModes = [UiMode.EGG_HATCH_SCENE, UiMode.EGG_HATCH_SUMMARY];
+    if (
+      [...pokedexUiModes, ...eggHatchUiModes].includes(globalScene.ui.mode)
+      || globalScene.phaseManager.getCurrentPhase().is("SelectStarterPhase")
+    ) {
+      return false;
+    }
+
+    const seedOffset = 500 * speciesId + abilityId.value;
+
+    globalScene.executeWithSeedOffset(() => {
+      abilityId.value = randSeedItem(this.validAbilityIds);
+    }, seedOffset);
+
+    return true;
+  }
+
+  public override applyStarterCost(speciesId: SpeciesId, cost: ValueHolder<number>): boolean {
+    switch (speciesId) {
+      case SpeciesId.NINCADA:
+        cost.value -= 2; // 4 -> 2
+        return true;
+      case SpeciesId.MEDITITE:
+        cost.value -= 1; // 3 -> 2
+        return true;
+      case SpeciesId.AZURILL:
+        cost.value -= 1; // 4 -> 3
+        return true;
+      case SpeciesId.DEWPIDER:
+        cost.value -= 1; // 3 -> 2
+        return true;
+      case SpeciesId.ARCHEN:
+        cost.value += 1; // 3 -> 4
+        return true;
+      case SpeciesId.SLAKOTH:
+        cost.value += 2; // 4 -> 6
+        return true;
+      case SpeciesId.REGIGIGAS:
+        cost.value += 1; // 7 -> 8
+        return true;
+    }
+
+    return false;
+  }
+}
+
+/**
+ * @param source - A challenge to copy, or an object of a challenge's properties. Missing values are treated as defaults.
+ * @returns The challenge in question.
+ * @throws An error if a challenge object with an invalid ID is passed in
+ */
+export function copyChallenge(source: Challenge | any): Challenge {
+  const challengeId = source.id as Challenges;
+  switch (challengeId) {
+    case Challenges.SINGLE_GENERATION:
+      return SingleGenerationChallenge.loadChallenge(source);
+    case Challenges.SINGLE_TYPE:
+      return SingleTypeChallenge.loadChallenge(source);
+    case Challenges.LOWER_MAX_STARTER_COST:
+      return LowerStarterMaxCostChallenge.loadChallenge(source);
+    case Challenges.LOWER_STARTER_POINTS:
+      return LowerStarterPointsChallenge.loadChallenge(source);
+    case Challenges.FRESH_START:
+      return FreshStartChallenge.loadChallenge(source);
+    case Challenges.INVERSE_BATTLE:
+      return InverseBattleChallenge.loadChallenge(source);
+    case Challenges.FLIP_STAT:
+      return FlipStatChallenge.loadChallenge(source);
+    case Challenges.LIMITED_CATCH:
+      return LimitedCatchChallenge.loadChallenge(source);
+    case Challenges.LIMITED_SUPPORT:
+      return LimitedSupportChallenge.loadChallenge(source);
+    case Challenges.HARDCORE:
+      return HardcoreChallenge.loadChallenge(source);
+    case Challenges.PASSIVES:
+      return PassivesChallenge.loadChallenge(source);
+    case Challenges.MOVESET_RANDOMIZER:
+      return MovesetRandomizerChallenge.loadChallenge(source);
+    case Challenges.ABILITY_RANDOMIZER:
+      return AbilityRandomizerChallenge.loadChallenge(source);
+    default:
+      challengeId satisfies never;
+      throw new Error("Unknown challenge copied");
+  }
+}
+
+export const allChallenges: Challenge[] = [];
+
+export function initChallenges(): void {
+  // TODO: Use `ChallengeCategory.UNUSED` to avoid activating a challenge without a real category
+  allChallenges.push(
+    new SingleGenerationChallenge(),
+    new SingleTypeChallenge(),
+    // new LowerStarterMaxCostChallenge(),
+    // new LowerStarterPointsChallenge(),
+    new FreshStartChallenge(),
+    new InverseBattleChallenge(),
+    new FlipStatChallenge(),
+    new LimitedCatchChallenge(),
+    new LimitedSupportChallenge(),
+    new HardcoreChallenge(),
+    new PassivesChallenge(),
+    new MovesetRandomizerChallenge(),
+    new AbilityRandomizerChallenge(),
+  );
+}
+
+const challengeMap: Record<Challenges, Constructor<Challenge>> = {
+  [Challenges.SINGLE_GENERATION]: SingleGenerationChallenge,
+  [Challenges.SINGLE_TYPE]: SingleTypeChallenge,
+  [Challenges.LOWER_MAX_STARTER_COST]: LowerStarterMaxCostChallenge,
+  [Challenges.LOWER_STARTER_POINTS]: LowerStarterPointsChallenge,
+  [Challenges.FRESH_START]: FreshStartChallenge,
+  [Challenges.INVERSE_BATTLE]: InverseBattleChallenge,
+  [Challenges.FLIP_STAT]: FlipStatChallenge,
+  [Challenges.LIMITED_CATCH]: LimitedCatchChallenge,
+  [Challenges.LIMITED_SUPPORT]: LimitedSupportChallenge,
+  [Challenges.HARDCORE]: HardcoreChallenge,
+  [Challenges.PASSIVES]: PassivesChallenge,
+  [Challenges.MOVESET_RANDOMIZER]: MovesetRandomizerChallenge,
+  [Challenges.ABILITY_RANDOMIZER]: AbilityRandomizerChallenge,
+};
+
+function getChallenge(challengeId: Challenges): Challenge {
+  return new challengeMap[challengeId]();
+}

@@ -1,0 +1,172 @@
+import { getPokemonNameWithAffix } from "#app/messages";
+import { AbilityId } from "#enums/ability-id";
+import { BattlerIndex } from "#enums/battler-index";
+import { MoveId } from "#enums/move-id";
+import { MoveResult } from "#enums/move-result";
+import { PositionalTagType } from "#enums/positional-tag-type";
+import { SpeciesId } from "#enums/species-id";
+import type { PokemonHealPhase } from "#phases/pokemon-heal-phase";
+import { GameManager } from "#test/framework/game-manager";
+import { toDmgValue } from "#utils/common";
+import i18next from "i18next";
+import Phaser from "phaser";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+describe("Move - Wish", () => {
+  let phaserGame: Phaser.Game;
+  let game: GameManager;
+
+  beforeAll(() => {
+    phaserGame = new Phaser.Game({
+      type: Phaser.HEADLESS,
+    });
+  });
+
+  beforeEach(() => {
+    game = new GameManager(phaserGame);
+    game.override
+      .ability(AbilityId.BALL_FETCH)
+      .battleStyle("single")
+      .criticalHits(false)
+      .enemySpecies(SpeciesId.MAGIKARP)
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemyMoveset(MoveId.SPLASH)
+      .startingLevel(100)
+      .enemyLevel(100);
+  });
+
+  it("should heal the Pokemon in the current slot for 50% of the user's maximum HP", async () => {
+    await game.classicMode.startBattle(SpeciesId.ALOMOMOLA, SpeciesId.BLISSEY);
+
+    const [alomomola, blissey] = game.scene.getPlayerParty();
+    alomomola.hp = 1;
+    blissey.hp = 1;
+
+    game.move.use(MoveId.WISH);
+    await game.toNextTurn();
+
+    expect(game).toHavePositionalTag(PositionalTagType.WISH);
+
+    game.doSwitchPokemon(1);
+    await game.toEndOfTurn();
+
+    expect(game).not.toHavePositionalTag(PositionalTagType.WISH);
+    expect(game).toHaveShownMessage(
+      i18next.t("arenaTag:wishTagOnAdd", {
+        pokemonNameWithAffix: getPokemonNameWithAffix(alomomola),
+      }),
+    );
+    expect(alomomola).toHaveHp(1);
+    expect(blissey).toHaveHp(toDmgValue(alomomola.getMaxHp() / 2) + 1);
+  });
+
+  it("should work if the user has full HP, but not if it already has an active Wish", async () => {
+    await game.classicMode.startBattle(SpeciesId.ALOMOMOLA, SpeciesId.BLISSEY);
+
+    const alomomola = game.field.getPlayerPokemon();
+    alomomola.hp = 1;
+
+    game.move.use(MoveId.WISH);
+    await game.toNextTurn();
+
+    expect(game).toHavePositionalTag(PositionalTagType.WISH);
+
+    game.move.use(MoveId.WISH);
+    await game.toEndOfTurn();
+
+    expect(alomomola.hp).toBe(toDmgValue(alomomola.getMaxHp() / 2) + 1);
+    expect(alomomola).toHaveUsedMove({ move: MoveId.WISH, result: MoveResult.FAIL });
+  });
+
+  it("should function independently of Future Sight", async () => {
+    await game.classicMode.startBattle(SpeciesId.ALOMOMOLA, SpeciesId.BLISSEY);
+
+    const [alomomola, blissey] = game.scene.getPlayerParty();
+    alomomola.hp = 1;
+    blissey.hp = 1;
+
+    game.move.use(MoveId.WISH);
+    await game.move.forceEnemyMove(MoveId.FUTURE_SIGHT);
+    game.setTurnOrder([BattlerIndex.ENEMY, BattlerIndex.PLAYER]);
+    await game.toNextTurn();
+
+    expect(game).toHavePositionalTag(PositionalTagType.WISH);
+    expect(game).toHavePositionalTag(PositionalTagType.DELAYED_ATTACK);
+  });
+
+  it("should work in double battles and trigger in order of creation", async () => {
+    game.override.battleStyle("double");
+    await game.classicMode.startBattle(SpeciesId.ALOMOMOLA, SpeciesId.BLISSEY);
+
+    const [alomomola, blissey, karp1, karp2] = game.scene.getField();
+    alomomola.hp = 1;
+    blissey.hp = 1;
+
+    vi.spyOn(karp1, "getNameToRender").mockReturnValue("Karp 1");
+    vi.spyOn(karp2, "getNameToRender").mockReturnValue("Karp 2");
+
+    game.move.use(MoveId.WISH, BattlerIndex.PLAYER);
+    game.move.use(MoveId.WISH, BattlerIndex.PLAYER_2);
+    await game.move.forceEnemyMove(MoveId.WISH);
+    await game.move.forceEnemyMove(MoveId.WISH);
+
+    const oldOrder = [BattlerIndex.PLAYER, BattlerIndex.PLAYER_2, BattlerIndex.ENEMY, BattlerIndex.ENEMY_2];
+    game.setTurnOrder(oldOrder);
+    await game.toNextTurn();
+
+    expect(game).toHavePositionalTag(PositionalTagType.WISH, 4);
+
+    game.move.use(MoveId.SPLASH, BattlerIndex.PLAYER);
+    game.move.use(MoveId.SPLASH, BattlerIndex.PLAYER_2);
+    await game.move.forceEnemyMove(MoveId.SPLASH);
+    await game.move.forceEnemyMove(MoveId.SPLASH);
+
+    game.setTurnOrder([BattlerIndex.ENEMY_2, BattlerIndex.ENEMY, BattlerIndex.PLAYER_2, BattlerIndex.PLAYER]);
+    await game.phaseInterceptor.to("PositionalTagPhase");
+
+    // all wishes should have activated and added healing phases
+    expect(game).not.toHavePositionalTag(PositionalTagType.WISH);
+    expect(game).toBeAtPhase("PokemonHealPhase");
+
+    const healPhases = game.scene.phaseManager["phaseQueue"].findAll("PokemonHealPhase");
+    // account for the current phase about to be ran also being a PHP
+    // TODO: Make this into a matcher or similar
+    healPhases.unshift(game.scene.phaseManager.getCurrentPhase() as PokemonHealPhase);
+
+    expect(healPhases).toHaveLength(4);
+    expect(healPhases.map(php => php["battlerIndex"])).toEqual(oldOrder);
+
+    await game.toEndOfTurn();
+
+    expect(alomomola.hp).toBe(toDmgValue(alomomola.getMaxHp() / 2) + 1);
+    expect(blissey.hp).toBe(toDmgValue(blissey.getMaxHp() / 2) + 1);
+  });
+
+  it("should vanish and not play message if slot is empty", async () => {
+    game.override.battleStyle("double");
+    await game.classicMode.startBattle(SpeciesId.ALOMOMOLA, SpeciesId.BLISSEY);
+
+    const [alomomola, blissey] = game.scene.getPlayerParty();
+    alomomola.hp = 1;
+    blissey.hp = 1;
+
+    game.move.use(MoveId.SPLASH, BattlerIndex.PLAYER);
+    game.move.use(MoveId.WISH, BattlerIndex.PLAYER_2);
+    await game.toNextTurn();
+
+    expect(game).toHavePositionalTag(PositionalTagType.WISH);
+
+    game.move.use(MoveId.SPLASH, BattlerIndex.PLAYER);
+    game.move.use(MoveId.MEMENTO, BattlerIndex.PLAYER_2, BattlerIndex.ENEMY_2);
+    await game.toEndOfTurn();
+
+    // Wish went away without doing anything
+    expect(game).not.toHavePositionalTag(PositionalTagType.WISH);
+    expect(game).not.toHaveShownMessage(
+      i18next.t("arenaTag:wishTagOnAdd", {
+        pokemonNameWithAffix: getPokemonNameWithAffix(blissey),
+      }),
+    );
+    expect(alomomola.hp).toBe(1);
+  });
+});

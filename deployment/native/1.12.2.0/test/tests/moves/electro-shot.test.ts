@@ -1,0 +1,93 @@
+import { AbilityId } from "#enums/ability-id";
+import { BattlerTagType } from "#enums/battler-tag-type";
+import { MoveId } from "#enums/move-id";
+import { MoveResult } from "#enums/move-result";
+import { SpeciesId } from "#enums/species-id";
+import { Stat } from "#enums/stat";
+import { WeatherType } from "#enums/weather-type";
+import { GameManager } from "#test/framework/game-manager";
+import Phaser from "phaser";
+import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+
+describe("Moves - Electro Shot", () => {
+  let phaserGame: Phaser.Game;
+  let game: GameManager;
+
+  beforeAll(() => {
+    phaserGame = new Phaser.Game({
+      type: Phaser.HEADLESS,
+    });
+  });
+
+  beforeEach(() => {
+    game = new GameManager(phaserGame);
+    game.override
+      .battleStyle("single")
+      .startingLevel(100)
+      .enemySpecies(SpeciesId.SNORLAX)
+      .enemyLevel(100)
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemyMoveset(MoveId.SPLASH);
+  });
+
+  it("should increase the user's Sp. Atk on the first turn, then attack on the second turn", async () => {
+    await game.classicMode.startBattle(SpeciesId.MAGIKARP);
+
+    const playerPokemon = game.field.getPlayerPokemon();
+    const enemyPokemon = game.field.getEnemyPokemon();
+
+    game.move.use(MoveId.ELECTRO_SHOT);
+    await game.phaseInterceptor.to("TurnEndPhase");
+
+    expect(playerPokemon).toHaveBattlerTag(BattlerTagType.CHARGING);
+    expect(enemyPokemon).toHaveFullHp();
+    expect(playerPokemon).toHaveUsedMove({ move: MoveId.ELECTRO_SHOT, result: MoveResult.OTHER });
+    expect(playerPokemon).toHaveStatStage(Stat.SPATK, 1);
+
+    await game.phaseInterceptor.to("TurnEndPhase");
+
+    expect(playerPokemon).not.toHaveBattlerTag(BattlerTagType.CHARGING);
+    expect(playerPokemon).toHaveStatStage(Stat.SPATK, 1);
+    expect(playerPokemon).toHaveUsedMove({ move: MoveId.ELECTRO_SHOT, result: MoveResult.SUCCESS });
+    expect(playerPokemon).toHaveUsedPP(MoveId.ELECTRO_SHOT, 1);
+
+    expect(enemyPokemon).not.toHaveFullHp();
+  });
+
+  it.each([
+    { weatherType: WeatherType.RAIN, name: "Rain" },
+    { weatherType: WeatherType.HEAVY_RAIN, name: "Heavy Rain" },
+  ])("should fully resolve in one turn if $name is active", async ({ weatherType }) => {
+    game.override.weather(weatherType);
+    await game.classicMode.startBattle(SpeciesId.MAGIKARP);
+
+    const playerPokemon = game.field.getPlayerPokemon();
+    const enemyPokemon = game.field.getEnemyPokemon();
+
+    game.move.use(MoveId.ELECTRO_SHOT);
+    await game.phaseInterceptor.to("MoveEffectPhase", false);
+
+    expect(playerPokemon).toHaveStatStage(Stat.SPATK, 1);
+
+    await game.phaseInterceptor.to("MoveEndPhase");
+
+    expect(playerPokemon).not.toHaveBattlerTag(BattlerTagType.CHARGING);
+    expect(enemyPokemon).not.toHaveFullHp();
+    expect(playerPokemon.getMoveHistory()).toHaveLength(2);
+    expect(playerPokemon).toHaveUsedMove({ move: MoveId.ELECTRO_SHOT, result: MoveResult.SUCCESS });
+    expect(playerPokemon).toHaveUsedPP(MoveId.ELECTRO_SHOT, 1);
+  });
+
+  it("should only increase Sp. Atk once with Multi-Lens", async () => {
+    game.override.weather(WeatherType.RAIN).startingHeldItems([{ name: "MULTI_LENS", count: 1 }]);
+    await game.classicMode.startBattle(SpeciesId.MAGIKARP);
+
+    const playerPokemon = game.field.getPlayerPokemon();
+
+    game.move.use(MoveId.ELECTRO_SHOT);
+    await game.phaseInterceptor.to("MoveEndPhase", false);
+
+    expect(playerPokemon.turnData.hitCount).toBe(1);
+    expect(playerPokemon).toHaveStatStage(Stat.SPATK, 1);
+  });
+});

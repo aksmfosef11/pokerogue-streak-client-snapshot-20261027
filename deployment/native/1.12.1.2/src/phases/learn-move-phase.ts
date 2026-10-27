@@ -1,0 +1,235 @@
+import { audioManager } from "#app/global-audio-manager";
+import { globalScene } from "#app/global-scene";
+import { settings } from "#app/global-settings-manager";
+import { getPokemonNameWithAffix } from "#app/messages";
+import { activeOverrides } from "#app/overrides";
+import { initMoveAnim, loadMoveAnimAssets } from "#data/battle-anims";
+import { allMoves } from "#data/data-lists";
+import { SpeciesFormChangeMoveLearnedTrigger } from "#data/form-change-triggers";
+import { LearnMoveType } from "#enums/learn-move-type";
+import { MoveId } from "#enums/move-id";
+import { UiMode } from "#enums/ui-mode";
+import type { Pokemon } from "#field/pokemon";
+import type { Move } from "#moves/move";
+import { PlayerPartyMemberPokemonPhase } from "#phases/player-party-member-pokemon-phase";
+import type { ConfirmModeConfig } from "#types/ui-types";
+import { EvolutionSceneUiHandler } from "#ui/evolution-scene-ui-handler";
+import { SummaryUiMode } from "#ui/summary-ui-handler";
+import i18next from "i18next";
+
+export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
+  public readonly phaseName = "LearnMovePhase";
+
+  private readonly moveId: MoveId;
+  private messageMode: UiMode;
+  private readonly learnMoveType: LearnMoveType;
+  private readonly cost: number;
+
+  constructor(
+    partyMemberIndex: number,
+    moveId: MoveId,
+    learnMoveType: LearnMoveType = LearnMoveType.LEARN_MOVE,
+    cost = -1,
+  ) {
+    super(partyMemberIndex);
+
+    this.moveId = moveId;
+    this.learnMoveType = learnMoveType;
+    this.cost = cost;
+  }
+
+  public override start(): void {
+    super.start();
+
+    const pokemon = this.getPokemon();
+    const move = allMoves[this.moveId];
+    const currentMoveset = pokemon.getMoveset();
+
+    if (move.isUnimplemented) {
+      this.end();
+      return;
+    }
+
+    const hasMoveAlready = currentMoveset.some(m => m.moveId === move.id) && this.moveId !== MoveId.SKETCH;
+    if (hasMoveAlready) {
+      this.end();
+      return;
+    }
+
+    this.messageMode =
+      globalScene.ui.getHandler() instanceof EvolutionSceneUiHandler ? UiMode.EVOLUTION_SCENE : UiMode.MESSAGE;
+    globalScene.ui.setMode(this.messageMode);
+    if (currentMoveset.length < 4) {
+      this.learnMove(currentMoveset.length, move, pokemon);
+    } else {
+      this.replaceMoveCheck(move, pokemon);
+    }
+  }
+
+  /**
+   * This displays a chain of messages (listed below) and asks if the user wishes to forget a move.
+   *
+   * > [Pokemon] wants to learn the move [MoveName] \
+   * > However, [Pokemon] already knows four moves. \
+   * > Should a move be forgotten and replaced with [MoveName]? --> `UiMode.CONFIRM` -> Yes: Go to `this.forgetMoveProcess()`, No: Go to `this.rejectMoveAndEnd()`
+   * @param move - The Move to be learned
+   * @param Pokemon - The Pokemon learning the move
+   */
+  private async replaceMoveCheck(move: Move, pokemon: Pokemon): Promise<void> {
+    const { ui } = globalScene;
+    const pokemonName = getPokemonNameWithAffix(pokemon);
+    const moveName = move.name;
+
+    const learnMovePrompt = i18next.t("battle:learnMovePrompt", { pokemonName, moveName });
+    const moveLimitReached = i18next.t("battle:learnMoveLimitReached", { pokemonName });
+    const shouldReplaceQ = i18next.t("battle:learnMoveReplaceQuestion", { moveName });
+
+    const preQText = [learnMovePrompt, moveLimitReached].join("$");
+
+    await ui.showTextPromise(preQText);
+    await ui.showTextPromise(shouldReplaceQ, undefined, false);
+
+    const options: ConfirmModeConfig = {
+      yesHandler: () => this.forgetMoveProcess(move, pokemon),
+      noHandler: () => {
+        ui.setMode(this.messageMode);
+        this.rejectMoveAndEnd(move, pokemon);
+      },
+    };
+    await ui.setModeWithoutClear(UiMode.CONFIRM, options);
+  }
+
+  /**
+   * This facilitates the process in which an old move is chosen to be forgotten.
+   *
+   * > Which move should be forgotten?
+   *
+   * The game then goes `Mode.SUMMARY` to select a move to be forgotten. \
+   * If a player does not select a move or chooses the new move (`moveIndex === 4`), the game goes to `this.rejectMoveAndEnd()`. \
+   * If an old move is selected, the function then passes the `moveIndex` to `this.learnMove()`
+   * @param move - The Move to be learned
+   * @param Pokemon - The Pokemon learning the move
+   */
+  private async forgetMoveProcess(move: Move, pokemon: Pokemon): Promise<void> {
+    globalScene.ui.setMode(this.messageMode);
+    await globalScene.ui.showTextPromise(i18next.t("battle:learnMoveForgetQuestion"), undefined, true);
+    await globalScene.ui.setModeWithoutClear(
+      UiMode.SUMMARY,
+      pokemon,
+      SummaryUiMode.LEARN_MOVE,
+      move,
+      (moveIndex: number) => {
+        if (moveIndex === 4) {
+          globalScene.ui.setMode(this.messageMode).then(() => this.rejectMoveAndEnd(move, pokemon));
+          return;
+        }
+        const forgetSuccessText = i18next.t("battle:learnMoveForgetSuccess", {
+          pokemonName: getPokemonNameWithAffix(pokemon),
+          moveName: pokemon.moveset[moveIndex]!.getName(),
+        });
+        const fullText = [i18next.t("battle:countdownPoof"), forgetSuccessText, i18next.t("battle:learnMoveAnd")].join(
+          "$",
+        );
+        globalScene.ui.setMode(this.messageMode).then(() => this.learnMove(moveIndex, move, pokemon, fullText));
+      },
+    );
+  }
+
+  /**
+   * This asks the player if they wish to end the current move learning process.
+   *
+   * > "Stop trying to teach [MoveName]?"" --> `UiMode.CONFIRM` --> Yes: "[Pokemon] did not learn the move [MoveName]", No: `this.replaceMoveCheck()`
+   *
+   * If the player wishes to not teach the Pokemon the move, it displays a message and ends the phase. \
+   * If the player reconsiders, it repeats the process for a Pokemon with a full moveset once again.
+   * @param move - The Move to be learned
+   * @param Pokemon - The Pokemon learning the move
+   */
+  private async rejectMoveAndEnd(move: Move, pokemon: Pokemon): Promise<void> {
+    const { ui } = globalScene;
+
+    const pokemonName = getPokemonNameWithAffix(pokemon);
+    const moveName = move.name;
+
+    if (!settings.general.levelMoveConfirmation) {
+      await ui.setMode(this.messageMode);
+      await ui.showTextPromise(i18next.t("battle:learnMoveNotLearned", { pokemonName, moveName }), undefined, true);
+      this.end();
+      return;
+    }
+
+    await ui.showTextPromise(i18next.t("battle:learnMoveStopTeaching", { moveName }), undefined, false);
+
+    const options: ConfirmModeConfig = {
+      yesHandler: () => {
+        ui.setMode(this.messageMode);
+        ui.showTextPromise(i18next.t("battle:learnMoveNotLearned", { pokemonName, moveName }), undefined, true) //
+          .then(() => this.end());
+      },
+      noHandler: () => {
+        ui.setMode(this.messageMode);
+        this.replaceMoveCheck(move, pokemon);
+      },
+    };
+
+    await ui.setModeWithoutClear(UiMode.CONFIRM, options);
+  }
+
+  /**
+   * This teaches the Pokemon the new move and ends the phase. \
+   * When a Pokemon forgets a move and learns a new one, its 'Learn Move' message is significantly longer.
+   *
+   * Pokemon with a `moveset.length < 4`
+   * > [Pokemon] learned [MoveName]
+   *
+   * Pokemon with a `moveset.length > 4`
+   * > 1... 2... and 3... and Poof! \
+   * > [Pokemon] forgot how to use [MoveName] \
+   * > And... \
+   * > [Pokemon] learned [MoveName]!
+   * @param move - The Move to be learned
+   * @param Pokemon - The Pokemon learning the move
+   */
+  private async learnMove(index: number, move: Move, pokemon: Pokemon, textMessage?: string): Promise<void> {
+    if (this.learnMoveType === LearnMoveType.TM) {
+      if (!pokemon.usedTMs.includes(this.moveId)) {
+        pokemon.usedTMs.push(this.moveId);
+      }
+      globalScene.phaseManager.tryRemovePhase("SelectModifierPhase");
+    } else if (this.learnMoveType === LearnMoveType.MEMORY) {
+      if (this.cost === -1) {
+        globalScene.phaseManager.tryRemovePhase("SelectModifierPhase");
+      } else {
+        if (!activeOverrides.WAIVE_ROLL_FEE_OVERRIDE) {
+          globalScene.money -= this.cost;
+          globalScene.updateMoneyText();
+          globalScene.animateMoneyChanged(false);
+        }
+        audioManager.playSound("se/buy");
+      }
+    }
+    pokemon.setMove(index, this.moveId);
+    initMoveAnim(this.moveId).then(() => {
+      loadMoveAnimAssets([this.moveId], true);
+    });
+    globalScene.ui.setMode(this.messageMode);
+    const learnMoveText = i18next.t("battle:learnMove", {
+      pokemonName: getPokemonNameWithAffix(pokemon),
+      moveName: move.name,
+    });
+    if (textMessage) {
+      await globalScene.ui.showTextPromise(textMessage);
+    }
+    audioManager.playSound("se/level_up_fanfare"); // Sound loaded into game as is
+    globalScene.ui.showText(
+      learnMoveText,
+      null,
+      () => {
+        globalScene.triggerPokemonFormChange(pokemon, SpeciesFormChangeMoveLearnedTrigger, true);
+        this.end();
+      },
+      this.messageMode === UiMode.EVOLUTION_SCENE ? 1000 : undefined,
+      true,
+    );
+  }
+}

@@ -1,0 +1,470 @@
+{
+  "arena": {
+    "biome": 1,
+    "positionalTags": [],
+    "tags": []
+  },
+  "battleType": 1,
+  "challenges": [],
+  "enemyModifiers": [
+    {
+      "args": [101, 0],
+      "className": "BaseStatModifier",
+      "player": false,
+      "stackCount": 7,
+      "typeId": "BASE_STAT_BOOSTER",
+      "typePregenArgs": [0]
+    },
+    {
+      "args": [101, 1],
+      "className": "BaseStatModifier",
+      "player": false,
+      "stackCount": 7,
+      "typeId": "BASE_STAT_BOOSTER",
+      "typePregenArgs": [1]
+    },
+    {
+      "args": [101, 2],
+      "className": "BaseStatModifier",
+      "player": false,
+      "stackCount": 7,
+      "typeId": "BASE_STAT_BOOSTER",
+      "typePregenArgs": [2]
+    },
+    {
+      "args": [101, 3],
+      "className": "BaseStatModifier",
+      "player": false,
+      "stackCount": 7,
+      "typeId": "BASE_STAT_BOOSTER",
+      "typePregenArgs": [3]
+    },
+    {
+      "args": [101, 4],
+      "className": "BaseStatModifier",
+      "player": false,
+      "stackCount": 7,
+      "typeId": "BASE_STAT_BOOSTER",
+      "typePregenArgs": [4]
+    },
+    {
+      "args": [101, 5],
+      "className": "BaseStatModifier",
+      "player": false,
+      "stackCount": 7,
+      "typeId": "BASE_STAT_BOOSTER",
+      "typePregenArgs": [5]
+    },
+    {
+      "args": [101],
+      "className": "PokemonNatureWeightModifier",
+      "player": false,
+      "stackCount": 3,
+      "typeId": "SOUL_DEW"
+    },
+    {
+      "args": [101],
+      "className": "HitHealModifier",
+      "player": false,
+      "stackCount": 2,
+      "typeId": "SHELL_BELL"
+    },
+    {
+      "args": [101],
+      "className": "TurnHealModifier",
+      "player": false,
+      "stackCount": 1,
+      "typeId": "LEFTOVERS"
+    }
+  ],
+  "enemyParty": [
+    {
+      "abilityIndex": 0,
+      "battleData": {},
+      "boss": false,
+      "bossSegments": 0,
+      "customPokemonData": {},
+      "formIndex": 0,
+      "friendship": 255,
+      "fusionCustomPokemonData": {},
+      "gender": 0,
+      "hp": 1,
+      "id": 101,
+      "isTerastallized": false,
+      "ivs": [31, 31, 31, 31, 31, 31],
+      "level": 100,
+      "metBiome": -1,
+      "metSpecies": 3,
+      "metWave": -1,
+      "moveset": [
+        {
+          "moveId": 75,
+          "ppUp": 0,
+          "ppUsed": 0
+        },
+        {
+          "moveId": 188,
+          "ppUp": 0,
+          "ppUsed": 0
+        },
+        {
+          "moveId": 235,
+          "ppUp": 0,
+          "ppUsed": 0
+        },
+        {
+          "moveId": 36,
+          "ppUp": 0,
+          "ppUsed": 0
+        }
+      ],
+      "nature": 3,
+      "player": false,
+      "species": 3,
+      "stats": [1, 1, 1, 1, 1, 1],
+      "status": null,
+      "stellarTypesBoosted": [],
+      "summonData": {},
+      "teraType": 0,
+      "variant": 0
+    },
+    {
+      "abilityIndex": 0,
+      "battleData": {},
+      "boss": false,
+      "bossSegments": 0,
+      "customPokemonData": {},
+      "formIndex": 0,
+      "friendship": 255,
+      "fusionCustomPokemonData": {},
+      "gender": 0,
+      "hp": 1,
+      "id": 102,
+      "isTerastallized": false,
+      "ivs": [31, 31, 31, 31, 31, 31],
+      "level": 100,
+      "metBiome": -1,
+      "metSpecies": 6,
+      "metWave": -1,
+      "moveset": [
+        {
+          "moveId": 53,
+          "ppUp": 0,
+          "ppUsed": 0
+        },
+        {
+          "moveId": 403,
+          "ppUp": 0,
+          "ppUsed": 0
+        },
+        {
+          "moveId": 163,
+          "ppUp": 0,
+          "ppUsed": 0
+        },
+        {
+          "moveId": 108,
+          "ppUp": 0,
+          "ppUsed": 0
+        }
+      ],
+      "nature": 0,
+      "player": false,
+      "species": 6,
+      "stats": [1, 1, 1, 1, 1, 1],
+      "status": null,
+      "stellarTypesBoosted": [],
+      "summonData": {},
+      "teraType": 0,
+      "variant": 0
+    },
+    {
+      "abilityIndex": 0,
+      "battleData": {},
+      "boss": false,
+      "bossSegments": 0,
+      "customPokemonData": {},
+      "formIndex": 0,
+      "friendship": 255,
+      "fusionCustomPokemonData": {},
+      "gender": 0,
+      "hp": 1,
+      "id": 103,
+      "isTerastallized": false,
+      "ivs": [31, 31, 31, 31, 31, 31],
+      "level": 100,
+      "metBiome": -1,
+      "metSpecies": 9,
+      "metWave": -1,
+      "moveset": [
+        {
+          "moveId": 57,
+          "ppUp": 0,
+          "ppUsed": 0
+        },
+        {
+          "moveId": 58,
+          "ppUp": 0,
+          "ppUsed": 0
+        },
+        {
+          "moveId": 44,
+          "ppUp": 0,
+          "ppUsed": 0
+        },
+        {
+          "moveId": 182,
+          "ppUp": 0,
+          "ppUsed": 0
+        }
+      ],
+      "nature": 0,
+      "player": false,
+      "species": 9,
+      "stats": [1, 1, 1, 1, 1, 1],
+      "status": null,
+      "stellarTypesBoosted": [],
+      "summonData": {},
+      "teraType": 0,
+      "variant": 0
+    }
+  ],
+  "gameMode": 0,
+  "gameVersion": "1.12.1.3",
+  "modifiers": [
+    {
+      "args": [1, 0],
+      "className": "BaseStatModifier",
+      "player": true,
+      "stackCount": 7,
+      "typeId": "BASE_STAT_BOOSTER",
+      "typePregenArgs": [0]
+    },
+    {
+      "args": [1, 1],
+      "className": "BaseStatModifier",
+      "player": true,
+      "stackCount": 7,
+      "typeId": "BASE_STAT_BOOSTER",
+      "typePregenArgs": [1]
+    },
+    {
+      "args": [1, 2],
+      "className": "BaseStatModifier",
+      "player": true,
+      "stackCount": 7,
+      "typeId": "BASE_STAT_BOOSTER",
+      "typePregenArgs": [2]
+    },
+    {
+      "args": [1, 3],
+      "className": "BaseStatModifier",
+      "player": true,
+      "stackCount": 7,
+      "typeId": "BASE_STAT_BOOSTER",
+      "typePregenArgs": [3]
+    },
+    {
+      "args": [1, 4],
+      "className": "BaseStatModifier",
+      "player": true,
+      "stackCount": 7,
+      "typeId": "BASE_STAT_BOOSTER",
+      "typePregenArgs": [4]
+    },
+    {
+      "args": [1, 5],
+      "className": "BaseStatModifier",
+      "player": true,
+      "stackCount": 7,
+      "typeId": "BASE_STAT_BOOSTER",
+      "typePregenArgs": [5]
+    },
+    {
+      "args": [1],
+      "className": "PokemonNatureWeightModifier",
+      "player": true,
+      "stackCount": 3,
+      "typeId": "SOUL_DEW"
+    },
+    {
+      "args": [1],
+      "className": "HitHealModifier",
+      "player": true,
+      "stackCount": 2,
+      "typeId": "SHELL_BELL"
+    },
+    {
+      "args": [1],
+      "className": "TurnHealModifier",
+      "player": true,
+      "stackCount": 1,
+      "typeId": "LEFTOVERS"
+    }
+  ],
+  "money": 0,
+  "mysteryEncounterSaveData": {},
+  "mysteryEncounterType": -1,
+  "party": [
+    {
+      "abilityIndex": 0,
+      "battleData": {},
+      "boss": false,
+      "bossSegments": 0,
+      "customPokemonData": {},
+      "formIndex": 0,
+      "friendship": 255,
+      "fusionCustomPokemonData": {},
+      "gender": 0,
+      "hp": 1,
+      "id": 1,
+      "isTerastallized": false,
+      "ivs": [31, 31, 31, 31, 31, 31],
+      "level": 100,
+      "metBiome": -1,
+      "metSpecies": 3,
+      "metWave": -1,
+      "moveset": [
+        {
+          "moveId": 75,
+          "ppUp": 0,
+          "ppUsed": 0
+        },
+        {
+          "moveId": 188,
+          "ppUp": 0,
+          "ppUsed": 0
+        },
+        {
+          "moveId": 235,
+          "ppUp": 0,
+          "ppUsed": 0
+        },
+        {
+          "moveId": 36,
+          "ppUp": 0,
+          "ppUsed": 0
+        }
+      ],
+      "nature": 3,
+      "player": true,
+      "species": 3,
+      "stats": [1, 1, 1, 1, 1, 1],
+      "status": null,
+      "stellarTypesBoosted": [],
+      "summonData": {},
+      "teraType": 0,
+      "variant": 0
+    },
+    {
+      "abilityIndex": 0,
+      "battleData": {},
+      "boss": false,
+      "bossSegments": 0,
+      "customPokemonData": {},
+      "formIndex": 0,
+      "friendship": 255,
+      "fusionCustomPokemonData": {},
+      "gender": 0,
+      "hp": 1,
+      "id": 2,
+      "isTerastallized": false,
+      "ivs": [31, 31, 31, 31, 31, 31],
+      "level": 100,
+      "metBiome": -1,
+      "metSpecies": 6,
+      "metWave": -1,
+      "moveset": [
+        {
+          "moveId": 53,
+          "ppUp": 0,
+          "ppUsed": 0
+        },
+        {
+          "moveId": 403,
+          "ppUp": 0,
+          "ppUsed": 0
+        },
+        {
+          "moveId": 163,
+          "ppUp": 0,
+          "ppUsed": 0
+        },
+        {
+          "moveId": 108,
+          "ppUp": 0,
+          "ppUsed": 0
+        }
+      ],
+      "nature": 0,
+      "player": true,
+      "species": 6,
+      "stats": [1, 1, 1, 1, 1, 1],
+      "status": null,
+      "stellarTypesBoosted": [],
+      "summonData": {},
+      "teraType": 0,
+      "variant": 0
+    },
+    {
+      "abilityIndex": 0,
+      "battleData": {},
+      "boss": false,
+      "bossSegments": 0,
+      "customPokemonData": {},
+      "formIndex": 0,
+      "friendship": 255,
+      "fusionCustomPokemonData": {},
+      "gender": 0,
+      "hp": 1,
+      "id": 3,
+      "isTerastallized": false,
+      "ivs": [31, 31, 31, 31, 31, 31],
+      "level": 100,
+      "metBiome": -1,
+      "metSpecies": 9,
+      "metWave": -1,
+      "moveset": [
+        {
+          "moveId": 57,
+          "ppUp": 0,
+          "ppUsed": 0
+        },
+        {
+          "moveId": 58,
+          "ppUp": 0,
+          "ppUsed": 0
+        },
+        {
+          "moveId": 44,
+          "ppUp": 0,
+          "ppUsed": 0
+        },
+        {
+          "moveId": 182,
+          "ppUp": 0,
+          "ppUsed": 0
+        }
+      ],
+      "nature": 0,
+      "player": true,
+      "species": 9,
+      "stats": [1, 1, 1, 1, 1, 1],
+      "status": null,
+      "stellarTypesBoosted": [],
+      "summonData": {},
+      "teraType": 0,
+      "variant": 0
+    }
+  ],
+  "playerFaints": 0,
+  "pokeballCounts": {},
+  "score": 0,
+  "seed": "streak-held-item-fixture",
+  "timestamp": 1793015832089,
+  "trainer": {
+    "trainerType": 1,
+    "variant": 0
+  },
+  "waveIndex": 100
+}

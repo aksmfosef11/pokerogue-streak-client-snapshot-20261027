@@ -1,0 +1,47 @@
+name: PvP compatibility
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  compatibility:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: corepack enable
+      - name: Pinned upstream dependencies
+        run: |
+          test "$(git -C assets rev-parse HEAD)" = 64b3f47cd586589261fe8cb08c8d540d710bfc1c
+          test "$(git -C locales rev-parse HEAD)" = 5cd9ba827721461a5a68edc55cc00b8b8aabd61d
+      - run: pnpm install --frozen-lockfile
+      - name: Establish the pinned upstream comparison
+        run: |
+          PVP_UPSTREAM_TAG="v$(node -p 'require("./package.json").version')"
+          git fetch https://github.com/pagefaultgames/pokerogue.git "refs/tags/$PVP_UPSTREAM_TAG:refs/tags/$PVP_UPSTREAM_TAG"
+          git branch --force vendor "$PVP_UPSTREAM_TAG"
+      - run: pnpm typecheck
+      - name: Audit harness types
+        run: pnpm exec tsc --noEmit -p scripts/tsconfig.json --module ESNext
+      - name: Upstream regression tests
+        env:
+          NODE_OPTIONS: --max-old-space-size=2048
+        run: |
+          set -e
+          for shard in 1 2 3 4 5; do
+            pnpm test --exclude 'test/tests/pvp/**' --shard="$shard/5" --silent=passed-only --maxWorkers=2
+          done
+      - name: Hook compatibility
+        run: pnpm pvp:check
+      - name: Determinism and save isolation golden tests
+        env:
+          NODE_OPTIONS: --max-old-space-size=2048
+        run: pnpm pvp:test --maxWorkers=1
+      - name: Balance export compatibility
+        run: node scripts/pvp/export-rules.mjs /tmp/pvp-rules.json
+      - name: Exported rules match the committed harness
+        run: git diff --exit-code -- src/pvp/rules-manifest.json

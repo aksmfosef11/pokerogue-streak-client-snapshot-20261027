@@ -1,0 +1,4 @@
+FROM auditbase
+WORKDIR /app
+RUN rm -rf /app/src /app/test /app/scripts /app/assets /app/locales /app/plugins /app/game-data-output
+COPY . .

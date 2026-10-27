@@ -1,0 +1,124 @@
+import { AbilityId } from "#enums/ability-id";
+import { BattlerTagType } from "#enums/battler-tag-type";
+import { MoveId } from "#enums/move-id";
+import { MoveResult } from "#enums/move-result";
+import { SpeciesId } from "#enums/species-id";
+import { StatusEffect } from "#enums/status-effect";
+import { WeatherType } from "#enums/weather-type";
+import { GameManager } from "#test/framework/game-manager";
+import Phaser from "phaser";
+import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+
+describe("Moves - Dive", () => {
+  let phaserGame: Phaser.Game;
+  let game: GameManager;
+
+  beforeAll(() => {
+    phaserGame = new Phaser.Game({
+      type: Phaser.HEADLESS,
+    });
+  });
+
+  beforeEach(() => {
+    game = new GameManager(phaserGame);
+    game.override
+      .battleStyle("single")
+      .startingLevel(100)
+      .enemySpecies(SpeciesId.SNORLAX)
+      .enemyLevel(100)
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemyMoveset(MoveId.TACKLE);
+  });
+
+  it("should make the user semi-invulnerable, then attack over 2 turns", async () => {
+    await game.classicMode.startBattle(SpeciesId.MAGIKARP);
+
+    const playerPokemon = game.field.getPlayerPokemon();
+    const enemyPokemon = game.field.getEnemyPokemon();
+
+    game.move.use(MoveId.DIVE);
+
+    await game.phaseInterceptor.to("TurnEndPhase");
+    expect(playerPokemon).toHaveBattlerTag(BattlerTagType.UNDERWATER);
+    expect(enemyPokemon).toHaveUsedMove({ move: MoveId.TACKLE, result: MoveResult.MISS });
+    expect(playerPokemon).toHaveFullHp();
+    expect(enemyPokemon).toHaveFullHp();
+    expect(playerPokemon.getMoveQueue()[0].move).toBe(MoveId.DIVE);
+
+    await game.phaseInterceptor.to("TurnEndPhase");
+    expect(playerPokemon).not.toHaveBattlerTag(BattlerTagType.UNDERWATER);
+    expect(enemyPokemon).not.toHaveFullHp();
+    expect(playerPokemon.getMoveHistory()).toHaveLength(2);
+
+    expect(playerPokemon).toHaveUsedPP(MoveId.DIVE, 1);
+  });
+
+  it("should not allow the user to evade attacks from Pokemon with No Guard", async () => {
+    game.override.enemyAbility(AbilityId.NO_GUARD);
+
+    await game.classicMode.startBattle(SpeciesId.MAGIKARP);
+
+    const playerPokemon = game.field.getPlayerPokemon();
+    const enemyPokemon = game.field.getEnemyPokemon();
+
+    game.move.use(MoveId.DIVE);
+
+    await game.phaseInterceptor.to("TurnEndPhase");
+    expect(playerPokemon).not.toHaveFullHp();
+    expect(enemyPokemon).toHaveUsedMove({ move: MoveId.TACKLE, result: MoveResult.SUCCESS });
+  });
+
+  it("should expend PP when the attack phase is cancelled by sleep", async () => {
+    game.override.enemyAbility(AbilityId.NO_GUARD).enemyMoveset(MoveId.SPORE);
+
+    await game.classicMode.startBattle(SpeciesId.MAGIKARP);
+
+    const playerPokemon = game.field.getPlayerPokemon();
+
+    game.move.use(MoveId.DIVE);
+
+    await game.phaseInterceptor.to("TurnEndPhase");
+    expect(playerPokemon).not.toHaveBattlerTag(BattlerTagType.UNDERWATER);
+    expect(playerPokemon).toHaveStatusEffect(StatusEffect.SLEEP);
+
+    expect(playerPokemon).toHaveUsedPP(MoveId.DIVE, 1);
+  });
+
+  it("should trigger on-contact post-defend ability effects", async () => {
+    game.override.enemyAbility(AbilityId.ROUGH_SKIN).enemyMoveset(MoveId.SPLASH);
+
+    await game.classicMode.startBattle(SpeciesId.MAGIKARP);
+
+    const playerPokemon = game.field.getPlayerPokemon();
+    const enemyPokemon = game.field.getEnemyPokemon();
+
+    game.move.use(MoveId.DIVE);
+
+    await game.phaseInterceptor.to("TurnEndPhase");
+
+    await game.phaseInterceptor.to("MoveEndPhase");
+    expect(playerPokemon).not.toHaveFullHp();
+    expect(enemyPokemon).toHaveAbilityApplied(AbilityId.ROUGH_SKIN);
+  });
+
+  it("should cancel attack after Harsh Sunlight is set", async () => {
+    game.override.enemyMoveset(MoveId.SPLASH);
+    await game.classicMode.startBattle(SpeciesId.MAGIKARP);
+
+    const playerPokemon = game.field.getPlayerPokemon();
+    const enemyPokemon = game.field.getEnemyPokemon();
+
+    game.move.use(MoveId.DIVE);
+
+    await game.phaseInterceptor.to("TurnEndPhase");
+    await game.phaseInterceptor.to("TurnStartPhase", false);
+    game.scene.arena.trySetWeather(WeatherType.HARSH_SUN);
+
+    await game.phaseInterceptor.to("MoveEndPhase");
+    expect(playerPokemon).toHaveUsedMove({ move: MoveId.DIVE, result: MoveResult.FAIL });
+    expect(enemyPokemon).toHaveFullHp();
+    expect(playerPokemon).not.toHaveBattlerTag(BattlerTagType.UNDERWATER);
+
+    expect(playerPokemon).toHaveUsedPP(MoveId.DIVE, 1);
+  });
+});
